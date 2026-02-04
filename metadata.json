@@ -1,0 +1,5 @@
+{
+  "name": "RCCA Helper",
+  "description": "Root Cause Corrective Action tool featuring interactive D3 cause mapping, integrated RAIL tracking, and evidence-based status workflows.",
+  "requestFramePermissions": []
+}
