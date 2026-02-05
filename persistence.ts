@@ -1,6 +1,37 @@
-import { AppState, SavedTree } from './types';
+import { AppState, AppSettings, SavedTree } from './types';
 
 const STORAGE_KEY = 'rcca-helper-state';
+const SETTINGS_KEY = 'rcca-helper-settings';
+const LAST_EXPORT_KEY = 'rcca-helper-last-export';
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  autoBackupEnabled: false,
+  autoBackupIntervalMinutes: 15,
+  projectFileName: 'RCCA_Backup',
+  theme: 'light',
+};
+
+export function loadSettings(): AppSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return DEFAULT_SETTINGS;
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+export function saveSettings(settings: AppSettings): void {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+export function getLastExportTimestamp(): string | null {
+  return localStorage.getItem(LAST_EXPORT_KEY);
+}
+
+export function setLastExportTimestamp(): void {
+  localStorage.setItem(LAST_EXPORT_KEY, new Date().toISOString());
+}
 
 export function loadAppState(): AppState | null {
   try {

@@ -8,6 +8,7 @@ export interface TreeStats {
   totalNotes: number;
   totalEvidence: number;
   confirmedCauses: CauseNode[];
+  rootCauses: CauseNode[];
 }
 
 export function flattenTree(node: CauseNode): CauseNode[] {
@@ -57,6 +58,7 @@ export function getTreeStats(tree: SavedTree): TreeStats {
     totalNotes: tree.notes.length,
     totalEvidence: tree.notes.filter(n => n.isEvidence).length,
     confirmedCauses: allNodes.filter(n => n.status === NodeStatus.CONFIRMED),
+    rootCauses: allNodes.filter(n => n.isRootCause === true),
   };
 }
 

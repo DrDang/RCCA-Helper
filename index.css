@@ -4,12 +4,144 @@
   --font-sans: 'Inter', sans-serif;
 }
 
+:root {
+  /* Surface colors */
+  --color-surface-primary: #ffffff;
+  --color-surface-secondary: #f8fafc;
+  --color-surface-tertiary: #f1f5f9;
+  --color-surface-hover: #e2e8f0;
+
+  /* Border colors */
+  --color-border-primary: #e2e8f0;
+  --color-border-secondary: #cbd5e1;
+
+  /* Text colors */
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #64748b;
+  --color-text-muted: #94a3b8;
+
+  /* Brand */
+  --color-brand: #4f46e5;
+  --color-brand-hover: #4338ca;
+  --color-brand-light: #eef2ff;
+
+  /* Status: Pending */
+  --color-status-pending-bg: #f8fafc;
+  --color-status-pending-border: #cbd5e1;
+  --color-status-pending-text: #334155;
+
+  /* Status: Active */
+  --color-status-active-bg: #fff7ed;
+  --color-status-active-border: #f97316;
+  --color-status-active-text: #9a3412;
+
+  /* Status: Ruled Out */
+  --color-status-ruled-out-bg: #f0fdf4;
+  --color-status-ruled-out-border: #22c55e;
+  --color-status-ruled-out-text: #166534;
+
+  /* Status: Confirmed */
+  --color-status-confirmed-bg: #fef2f2;
+  --color-status-confirmed-border: #ef4444;
+  --color-status-confirmed-text: #991b1b;
+
+  /* Action statuses */
+  --color-action-open-bg: #fff7ed;
+  --color-action-open-border: #f97316;
+  --color-action-open-text: #9a3412;
+  --color-action-progress-bg: #eff6ff;
+  --color-action-progress-border: #3b82f6;
+  --color-action-progress-text: #1e40af;
+  --color-action-complete-bg: #f0fdf4;
+  --color-action-complete-border: #22c55e;
+  --color-action-complete-text: #166534;
+  --color-action-blocked-bg: #fef2f2;
+  --color-action-blocked-border: #ef4444;
+  --color-action-blocked-text: #991b1b;
+  --color-action-closed-bg: #f8fafc;
+  --color-action-closed-border: #94a3b8;
+  --color-action-closed-text: #475569;
+
+  /* Scrollbar */
+  --color-scrollbar-track: #f1f5f9;
+  --color-scrollbar-thumb: #cbd5e1;
+  --color-scrollbar-thumb-hover: #94a3b8;
+}
+
+.dark {
+  /* Surface colors */
+  --color-surface-primary: #1e293b;
+  --color-surface-secondary: #0f172a;
+  --color-surface-tertiary: #334155;
+  --color-surface-hover: #475569;
+
+  /* Border colors */
+  --color-border-primary: #334155;
+  --color-border-secondary: #475569;
+
+  /* Text colors */
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-tertiary: #94a3b8;
+  --color-text-muted: #64748b;
+
+  /* Brand */
+  --color-brand: #818cf8;
+  --color-brand-hover: #6366f1;
+  --color-brand-light: #1e1b4b;
+
+  /* Status: Pending */
+  --color-status-pending-bg: #1e293b;
+  --color-status-pending-border: #475569;
+  --color-status-pending-text: #94a3b8;
+
+  /* Status: Active */
+  --color-status-active-bg: #431407;
+  --color-status-active-border: #fb923c;
+  --color-status-active-text: #fed7aa;
+
+  /* Status: Ruled Out */
+  --color-status-ruled-out-bg: #052e16;
+  --color-status-ruled-out-border: #4ade80;
+  --color-status-ruled-out-text: #bbf7d0;
+
+  /* Status: Confirmed */
+  --color-status-confirmed-bg: #450a0a;
+  --color-status-confirmed-border: #f87171;
+  --color-status-confirmed-text: #fecaca;
+
+  /* Action statuses */
+  --color-action-open-bg: #431407;
+  --color-action-open-border: #fb923c;
+  --color-action-open-text: #fed7aa;
+  --color-action-progress-bg: #172554;
+  --color-action-progress-border: #60a5fa;
+  --color-action-progress-text: #bfdbfe;
+  --color-action-complete-bg: #052e16;
+  --color-action-complete-border: #4ade80;
+  --color-action-complete-text: #bbf7d0;
+  --color-action-blocked-bg: #450a0a;
+  --color-action-blocked-border: #f87171;
+  --color-action-blocked-text: #fecaca;
+  --color-action-closed-bg: #1e293b;
+  --color-action-closed-border: #64748b;
+  --color-action-closed-text: #94a3b8;
+
+  /* Scrollbar */
+  --color-scrollbar-track: #1e293b;
+  --color-scrollbar-thumb: #475569;
+  --color-scrollbar-thumb-hover: #64748b;
+}
+
 body {
   font-family: 'Inter', sans-serif;
+  background-color: var(--color-surface-secondary);
+  color: var(--color-text-primary);
 }
 
 /* Custom scrollbar for webkit */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: #f1f5f9; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+::-webkit-scrollbar-track { background: var(--color-scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--color-scrollbar-thumb); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-scrollbar-thumb-hover); }

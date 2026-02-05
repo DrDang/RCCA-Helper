@@ -19,6 +19,7 @@ export interface CauseNode {
   rationale: string;
   status: NodeStatus;
   type: NodeType;
+  isRootCause?: boolean;
   children?: CauseNode[];
 }
 
@@ -57,6 +58,13 @@ export interface SavedTree {
   treeData: CauseNode;
   actions: ActionItem[];
   notes: Note[];
+}
+
+export interface AppSettings {
+  autoBackupEnabled: boolean;
+  autoBackupIntervalMinutes: number;
+  projectFileName: string;
+  theme: 'light' | 'dark';
 }
 
 export interface AppState {

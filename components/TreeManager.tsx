@@ -103,7 +103,8 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
       {/* Trigger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+        style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
       >
         <span className="max-w-48 truncate">{activeTree?.name ?? 'No Investigation'}</span>
         <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -115,11 +116,11 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
           {/* Backdrop */}
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
 
-          <div className="absolute top-full mt-2 right-0 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+          <div className="absolute top-full mt-2 right-0 w-80 rounded-xl shadow-xl z-50 overflow-hidden" style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-primary)' }}>
             {/* Header */}
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-700">Investigations</span>
-              <span className="text-xs text-slate-400">{trees.length} total</span>
+            <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--color-border-primary)' }}>
+              <span className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Investigations</span>
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{trees.length} total</span>
             </div>
 
             {/* Tree list */}
@@ -127,11 +128,16 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
               {trees.map(tree => (
                 <div
                   key={tree.id}
-                  className={`px-4 py-2.5 flex items-center gap-2 cursor-pointer hover:bg-slate-50 border-l-3 transition-colors ${
+                  className={`px-4 py-2.5 flex items-center gap-2 cursor-pointer border-l-3 transition-colors ${
                     tree.id === activeTreeId
-                      ? 'border-l-indigo-500 bg-indigo-50/50'
+                      ? 'border-l-indigo-500'
                       : 'border-l-transparent'
                   }`}
+                  style={{
+                    backgroundColor: tree.id === activeTreeId ? 'var(--color-brand-light)' : undefined,
+                  }}
+                  onMouseEnter={(e) => { if (tree.id !== activeTreeId) e.currentTarget.style.backgroundColor = 'var(--color-surface-tertiary)'; }}
+                  onMouseLeave={(e) => { if (tree.id !== activeTreeId) e.currentTarget.style.backgroundColor = ''; }}
                   onClick={() => {
                     if (renamingId !== tree.id) {
                       onSelectTree(tree.id);
@@ -157,26 +163,28 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
                             if (e.key === 'Escape') handleCancelRename();
                           }}
                           className="text-sm px-1.5 py-0.5 border border-indigo-300 rounded w-full focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                          style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-primary)' }}
                           autoFocus
                           onClick={e => e.stopPropagation()}
                         />
                         <button
                           onClick={e => { e.stopPropagation(); handleConfirmRename(); }}
-                          className="p-0.5 text-green-600 hover:bg-green-50 rounded"
+                          className="p-0.5 text-green-600 rounded"
                         >
                           <Check size={14} />
                         </button>
                         <button
                           onClick={e => { e.stopPropagation(); handleCancelRename(); }}
-                          className="p-0.5 text-slate-400 hover:bg-slate-100 rounded"
+                          className="p-0.5 rounded"
+                          style={{ color: 'var(--color-text-muted)' }}
                         >
                           <X size={14} />
                         </button>
                       </div>
                     ) : (
                       <>
-                        <div className="text-sm font-medium text-slate-800 truncate">{tree.name}</div>
-                        <div className="text-xs text-slate-400">{formatDate(tree.updatedAt)}</div>
+                        <div className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{tree.name}</div>
+                        <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{formatDate(tree.updatedAt)}</div>
                       </>
                     )}
                   </div>
@@ -185,28 +193,30 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         onClick={e => { e.stopPropagation(); handleStartRename(tree); }}
-                        className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
+                        className="p-1 rounded"
+                        style={{ color: 'var(--color-text-muted)' }}
                         title="Rename"
                       >
                         <Pencil size={13} />
                       </button>
                       <button
                         onClick={e => { e.stopPropagation(); onGenerateReport(tree.id); }}
-                        className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                        className="p-1 text-slate-400 hover:text-indigo-600 rounded"
                         title="Report"
                       >
                         <FileText size={13} />
                       </button>
                       <button
                         onClick={e => { e.stopPropagation(); onExportTree(tree.id); }}
-                        className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
+                        className="p-1 rounded"
+                        style={{ color: 'var(--color-text-muted)' }}
                         title="Export"
                       >
                         <Download size={13} />
                       </button>
                       <button
                         onClick={e => { e.stopPropagation(); onDeleteTree(tree.id); }}
-                        className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"
+                        className="p-1 text-slate-400 hover:text-red-500 rounded"
                         title="Delete"
                       >
                         <Trash2 size={13} />
@@ -218,7 +228,7 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="px-3 py-2.5 border-t border-slate-100 flex gap-2">
+            <div className="px-3 py-2.5 flex gap-2" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
               <button
                 onClick={() => { onCreateTree(); setIsOpen(false); }}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
@@ -228,7 +238,8 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+                style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
               >
                 <Upload size={15} />
                 Import
@@ -236,17 +247,19 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
             </div>
 
             {/* Bulk actions */}
-            <div className="px-3 py-2.5 border-t border-slate-100 flex gap-2">
+            <div className="px-3 py-2.5 flex gap-2" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
               <button
                 onClick={() => { onExportAll(); }}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+                style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
               >
                 <Package size={15} />
                 Export All
               </button>
               <button
                 onClick={() => bulkImportRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+                style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
               >
                 <PackageOpen size={15} />
                 Import All
@@ -254,7 +267,7 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
             </div>
 
             {/* Report actions */}
-            <div className="px-3 py-2.5 border-t border-slate-100 flex gap-2">
+            <div className="px-3 py-2.5 flex gap-2" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
               <button
                 onClick={() => { onGenerateBulkReport(); }}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"

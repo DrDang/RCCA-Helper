@@ -3,25 +3,50 @@ import { CauseNode, NodeStatus, NodeType } from './types';
 export const CARD_WIDTH = 220;
 export const CARD_HEIGHT = 100;
 
+// Theme-aware status colors (resolved via CSS custom properties)
 export const STATUS_COLORS = {
   [NodeStatus.PENDING]: {
-    bg: '#f8fafc', // slate-50
-    border: '#cbd5e1', // slate-300
+    bg: 'var(--color-status-pending-bg)',
+    border: 'var(--color-status-pending-border)',
+    text: 'var(--color-status-pending-text)'
+  },
+  [NodeStatus.ACTIVE]: {
+    bg: 'var(--color-status-active-bg)',
+    border: 'var(--color-status-active-border)',
+    text: 'var(--color-status-active-text)'
+  },
+  [NodeStatus.RULED_OUT]: {
+    bg: 'var(--color-status-ruled-out-bg)',
+    border: 'var(--color-status-ruled-out-border)',
+    text: 'var(--color-status-ruled-out-text)'
+  },
+  [NodeStatus.CONFIRMED]: {
+    bg: 'var(--color-status-confirmed-bg)',
+    border: 'var(--color-status-confirmed-border)',
+    text: 'var(--color-status-confirmed-text)'
+  }
+};
+
+// Hardcoded light-mode colors for standalone HTML reports
+export const REPORT_STATUS_COLORS = {
+  [NodeStatus.PENDING]: {
+    bg: '#f8fafc',
+    border: '#cbd5e1',
     text: '#334155'
   },
   [NodeStatus.ACTIVE]: {
-    bg: '#fff7ed', // orange-50
-    border: '#f97316', // orange-500
+    bg: '#fff7ed',
+    border: '#f97316',
     text: '#9a3412'
   },
   [NodeStatus.RULED_OUT]: {
-    bg: '#f0fdf4', // green-50
-    border: '#22c55e', // green-500
+    bg: '#f0fdf4',
+    border: '#22c55e',
     text: '#166534'
   },
   [NodeStatus.CONFIRMED]: {
-    bg: '#fef2f2', // red-50
-    border: '#ef4444', // red-500
+    bg: '#fef2f2',
+    border: '#ef4444',
     text: '#991b1b'
   }
 };

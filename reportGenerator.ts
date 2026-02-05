@@ -1,5 +1,5 @@
 import { SavedTree, CauseNode, NodeStatus } from './types';
-import { STATUS_COLORS } from './constants';
+import { REPORT_STATUS_COLORS as STATUS_COLORS } from './constants';
 import { flattenTree, getTreeStats, formatDate } from './treeUtils';
 
 const STATUS_LABELS: Record<NodeStatus, string> = {
@@ -33,6 +33,7 @@ function renderTreeHierarchy(node: CauseNode, notes: { referenceId: string; cont
         <strong style="color:${colors.text}">${escapeHtml(node.label)}</strong>
         <span style="font-size:11px;color:#64748b;text-transform:uppercase">${escapeHtml(node.type)}</span>
         ${statusBadge(STATUS_LABELS[node.status], colors)}
+        ${node.isRootCause ? '<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#f59e0b;color:#fff;margin-left:4px">ROOT CAUSE</span>' : ''}
       </div>`;
 
   if (node.description) {
@@ -167,12 +168,28 @@ function renderInvestigation(tree: SavedTree, headingTag: 'h1' | 'h2' = 'h1', an
   html += renderStatGrid('Nodes by Status', nodeCountsDisplay, nodeStatusDisplay);
   html += renderStatGrid('Actions by Status', stats.actionsByStatus, actionColorMap);
 
-  // Confirmed root causes
-  if (stats.confirmedCauses.length > 0) {
-    html += `<div style="margin-bottom:16px;padding:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px">
-      <div style="font-size:13px;font-weight:600;color:#991b1b;margin-bottom:6px">Confirmed Root Causes</div>
+  // Identified Root Causes (explicitly marked)
+  const explicitRootCauses = stats.confirmedCauses.filter(n => n.isRootCause);
+  const otherConfirmed = stats.confirmedCauses.filter(n => !n.isRootCause);
+
+  if (explicitRootCauses.length > 0) {
+    html += `<div style="margin-bottom:16px;padding:12px;background:#fffbeb;border:2px solid #f59e0b;border-radius:8px">
+      <div style="font-size:13px;font-weight:600;color:#92400e;margin-bottom:6px">Identified Root Causes</div>
       <ul style="margin:0;padding-left:20px">`;
-    for (const cause of stats.confirmedCauses) {
+    for (const cause of explicitRootCauses) {
+      html += `<li style="margin-bottom:4px;color:#92400e">
+        <strong>${escapeHtml(cause.label)}</strong>
+        ${cause.description ? `<span style="color:#64748b"> — ${escapeHtml(cause.description)}</span>` : ''}
+      </li>`;
+    }
+    html += `</ul></div>`;
+  }
+
+  if (otherConfirmed.length > 0) {
+    html += `<div style="margin-bottom:16px;padding:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px">
+      <div style="font-size:13px;font-weight:600;color:#991b1b;margin-bottom:6px">${explicitRootCauses.length > 0 ? 'Other Confirmed Causes' : 'Confirmed Root Causes'}</div>
+      <ul style="margin:0;padding-left:20px">`;
+    for (const cause of otherConfirmed) {
       html += `<li style="margin-bottom:4px;color:#991b1b">
         <strong>${escapeHtml(cause.label)}</strong>
         ${cause.description ? `<span style="color:#64748b"> — ${escapeHtml(cause.description)}</span>` : ''}

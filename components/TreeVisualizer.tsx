@@ -85,8 +85,8 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-slate-50 overflow-hidden relative cursor-move">
-      <div className="absolute top-4 left-4 z-10 bg-white/80 backdrop-blur p-2 rounded shadow text-xs text-slate-500">
+    <div ref={containerRef} className="w-full h-full overflow-hidden relative cursor-move" style={{ backgroundColor: 'var(--color-surface-secondary)' }}>
+      <div className="absolute top-4 left-4 z-10 backdrop-blur p-2 rounded shadow text-xs" style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-tertiary)', opacity: 0.8 }}>
         <div className="flex items-center gap-2 mb-1"><Move size={14} /> Pan & Zoom Supported</div>
       </div>
 
@@ -136,8 +136,9 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                   `}
                   style={{
                     backgroundColor: styles.bg,
-                    borderColor: isSelected ? '#6366f1' : styles.border,
-                    color: styles.text
+                    borderColor: isSelected ? '#6366f1' : (node.data.isRootCause ? '#f59e0b' : styles.border),
+                    color: styles.text,
+                    boxShadow: node.data.isRootCause ? '0 0 0 2px rgba(245,158,11,0.3)' : undefined,
                   }}
                 >
                   {/* Status Indicator Dot */}
@@ -178,15 +179,31 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                             onAddNode(node.data.id);
                         }}
                         className={`
-                            p-1 rounded bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 shadow-sm
+                            p-1 rounded shadow-sm
                             opacity-0 group-hover:opacity-100 transition-opacity
                             ${isSelected ? 'opacity-100' : ''}
                         `}
+                        style={{
+                            backgroundColor: 'var(--color-surface-primary)',
+                            borderColor: 'var(--color-border-primary)',
+                            color: 'var(--color-text-secondary)',
+                            border: '1px solid var(--color-border-primary)',
+                        }}
                         title="Add Child Cause"
                      >
                         <Plus size={14} />
                      </button>
                   </div>
+
+                  {/* Root Cause badge */}
+                  {node.data.isRootCause && (
+                    <div
+                      className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-amber-500 border border-white shadow-sm"
+                      title="Root Cause"
+                    >
+                      <span className="text-[9px] font-bold text-white uppercase tracking-wider whitespace-nowrap">Root Cause</span>
+                    </div>
+                  )}
                 </div>
               </foreignObject>
             );

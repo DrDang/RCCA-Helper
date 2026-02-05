@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
 import { ActionItem, CauseNode, Note, NodeStatus, NodeType } from '../types';
 import { STATUS_COLORS } from '../constants';
-import { 
-    ClipboardList, 
-    StickyNote, 
-    CheckCircle2, 
-    AlertTriangle, 
-    XCircle, 
-    Plus, 
+import {
+    ClipboardList,
+    StickyNote,
+    CheckCircle2,
+    AlertTriangle,
+    XCircle,
+    Plus,
     Trash2,
     Calendar,
     User
 } from 'lucide-react';
 
 const ACTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  'Open': { bg: '#fff7ed', border: '#f97316', text: '#9a3412' },
-  'In Progress': { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af' },
-  'Complete': { bg: '#f0fdf4', border: '#22c55e', text: '#166534' },
-  'Blocked': { bg: '#fef2f2', border: '#ef4444', text: '#991b1b' },
-  'Closed': { bg: '#f8fafc', border: '#94a3b8', text: '#475569' },
+  'Open': { bg: 'var(--color-action-open-bg)', border: 'var(--color-action-open-border)', text: 'var(--color-action-open-text)' },
+  'In Progress': { bg: 'var(--color-action-progress-bg)', border: 'var(--color-action-progress-border)', text: 'var(--color-action-progress-text)' },
+  'Complete': { bg: 'var(--color-action-complete-bg)', border: 'var(--color-action-complete-border)', text: 'var(--color-action-complete-text)' },
+  'Blocked': { bg: 'var(--color-action-blocked-bg)', border: 'var(--color-action-blocked-border)', text: 'var(--color-action-blocked-text)' },
+  'Closed': { bg: 'var(--color-action-closed-bg)', border: 'var(--color-action-closed-border)', text: 'var(--color-action-closed-text)' },
 };
 
 // Active statuses float to top, terminal statuses sink to bottom
@@ -59,9 +59,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
   if (!selectedNode) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8 text-center bg-white border-l border-slate-200">
+      <div className="h-full flex flex-col items-center justify-center p-8 text-center" style={{ backgroundColor: 'var(--color-surface-primary)', borderLeft: '1px solid var(--color-border-primary)', color: 'var(--color-text-muted)' }}>
         <ClipboardList size={48} className="mb-4 opacity-50" />
-        <h3 className="font-semibold text-lg text-slate-600">No Selection</h3>
+        <h3 className="font-semibold text-lg" style={{ color: 'var(--color-text-secondary)' }}>No Selection</h3>
         <p className="text-sm">Select a node from the Cause Tree to view details, manage actions (RAIL), or add evidence.</p>
       </div>
     );
@@ -81,18 +81,22 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
            return;
        }
     }
-    onUpdateNode({ ...selectedNode, status: newStatus });
+    const updatedNode = { ...selectedNode, status: newStatus };
+    if (newStatus !== NodeStatus.CONFIRMED) {
+      updatedNode.isRootCause = false;
+    }
+    onUpdateNode(updatedNode);
   };
 
   return (
-    <div className="h-full flex flex-col bg-white border-l border-slate-200 w-[450px] shadow-xl z-20">
+    <div className="h-full flex flex-col w-[450px] shadow-xl z-20" style={{ backgroundColor: 'var(--color-surface-primary)', borderLeft: '1px solid var(--color-border-primary)' }}>
       {/* Header */}
-      <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+      <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid var(--color-border-primary)', backgroundColor: 'var(--color-surface-secondary)' }}>
         <div>
-            <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">{selectedNode.type}</span>
-            <h2 className="font-bold text-lg text-slate-800 truncate w-64">{selectedNode.label}</h2>
+            <span className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'var(--color-text-muted)' }}>{selectedNode.type}</span>
+            <h2 className="font-bold text-lg truncate w-64" style={{ color: 'var(--color-text-primary)' }}>{selectedNode.label}</h2>
         </div>
-        <button 
+        <button
             onClick={() => onDeleteNode(selectedNode.id)}
             className="text-red-400 hover:text-red-600 p-2 rounded hover:bg-red-50"
             title="Delete Node"
@@ -102,37 +106,41 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200">
-        <button 
+      <div className="flex" style={{ borderBottom: '1px solid var(--color-border-primary)' }}>
+        <button
             onClick={() => setActiveTab('details')}
-            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'details' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'details' ? 'border-indigo-500 text-indigo-600' : 'border-transparent'}`}
+            style={activeTab !== 'details' ? { color: 'var(--color-text-tertiary)' } : undefined}
         >
             Details
         </button>
-        <button 
+        <button
             onClick={() => setActiveTab('rail')}
-            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'rail' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'rail' ? 'border-indigo-500 text-indigo-600' : 'border-transparent'}`}
+            style={activeTab !== 'rail' ? { color: 'var(--color-text-tertiary)' } : undefined}
         >
             RAIL ({nodeActions.length})
         </button>
-        <button 
+        <button
             onClick={() => setActiveTab('notes')}
-            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'notes' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'notes' ? 'border-indigo-500 text-indigo-600' : 'border-transparent'}`}
+            style={activeTab !== 'notes' ? { color: 'var(--color-text-tertiary)' } : undefined}
         >
             Notes ({nodeNotes.length})
         </button>
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
-        
+      <div className="flex-1 overflow-y-auto p-4" style={{ backgroundColor: 'var(--color-surface-secondary)' }}>
+
         {/* DETAILS TAB */}
         {activeTab === 'details' && (
           <div className="space-y-6">
             <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase">Description</label>
-                <textarea 
-                    className="w-full p-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+                <label className="text-xs font-semibold uppercase" style={{ color: 'var(--color-text-tertiary)' }}>Description</label>
+                <textarea
+                    className="w-full p-2 text-sm rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+                    style={{ backgroundColor: 'var(--color-surface-primary)', borderColor: 'var(--color-border-secondary)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-secondary)' }}
                     rows={4}
                     value={selectedNode.description}
                     onChange={(e) => onUpdateNode({...selectedNode, description: e.target.value})}
@@ -140,7 +148,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             </div>
 
             <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase">Investigation Status</label>
+                <label className="text-xs font-semibold uppercase" style={{ color: 'var(--color-text-tertiary)' }}>Investigation Status</label>
                 <div className="grid grid-cols-2 gap-2">
                     {Object.values(NodeStatus).map((status) => (
                         <button
@@ -169,22 +177,40 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         <CheckCircle2 size={12} /> Evidence verified.
                     </p>
                 )}
+                {selectedNode.status === NodeStatus.CONFIRMED && (
+                    <div className="mt-3 p-3 rounded-lg border-2 border-amber-300 bg-amber-50">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={selectedNode.isRootCause ?? false}
+                                onChange={(e) => onUpdateNode({...selectedNode, isRootCause: e.target.checked})}
+                                className="rounded text-amber-600 focus:ring-amber-500"
+                            />
+                            <span className="text-sm font-semibold text-amber-800">Mark as Root Cause</span>
+                        </label>
+                        <p className="text-xs text-amber-600 mt-1">
+                            Designate this confirmed cause as a root cause of the investigation.
+                        </p>
+                    </div>
+                )}
             </div>
 
             <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase">Node Label</label>
+                <label className="text-xs font-semibold uppercase" style={{ color: 'var(--color-text-tertiary)' }}>Node Label</label>
                 <input
                     type="text"
                     value={selectedNode.label}
                     onChange={(e) => onUpdateNode({...selectedNode, label: e.target.value})}
-                    className="w-full p-2 text-sm border border-slate-300 rounded"
+                    className="w-full p-2 text-sm rounded"
+                    style={{ backgroundColor: 'var(--color-surface-primary)', borderColor: 'var(--color-border-secondary)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-secondary)' }}
                 />
             </div>
 
             <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase">Rationale</label>
+                <label className="text-xs font-semibold uppercase" style={{ color: 'var(--color-text-tertiary)' }}>Rationale</label>
                 <textarea
-                    className="w-full p-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="w-full p-2 text-sm rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+                    style={{ backgroundColor: 'var(--color-surface-primary)', borderColor: 'var(--color-border-secondary)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-secondary)' }}
                     rows={3}
                     placeholder="Why should this cause be investigated? What evidence or reasoning justifies its inclusion?"
                     value={selectedNode.rationale ?? ''}
@@ -212,32 +238,35 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     >
                         <button
                             onClick={() => onDeleteAction(action.id)}
-                            className="absolute top-2 right-2 text-slate-300 hover:text-red-400"
+                            className="absolute top-2 right-2 hover:text-red-400"
+                            style={{ color: 'var(--color-text-muted)' }}
                             title="Delete Action"
                         >
                             <XCircle size={14} />
                         </button>
                         <input
-                            className="font-semibold w-full mb-2 bg-transparent focus:bg-white/50 outline-none pr-6"
+                            className="font-semibold w-full mb-2 bg-transparent outline-none pr-6"
                             style={{ color: colors.text }}
                             value={action.action}
                             onChange={(e) => onUpdateAction({...action, action: e.target.value})}
                         />
                         <div className="grid grid-cols-2 gap-2 mb-2">
-                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                            <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
                                 <User size={10} />
                                 <input
-                                    className="bg-transparent border-b border-slate-200 focus:border-indigo-500 outline-none w-full"
+                                    className="bg-transparent outline-none w-full"
+                                    style={{ borderBottom: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}
                                     value={action.assignee}
                                     onChange={(e) => onUpdateAction({...action, assignee: e.target.value})}
                                     placeholder="Assignee"
                                 />
                             </div>
-                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                            <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
                                 <Calendar size={10} />
                                 <input
                                     type="date"
-                                    className="bg-transparent border-b border-slate-200 focus:border-indigo-500 outline-none w-full"
+                                    className="bg-transparent outline-none w-full"
+                                    style={{ borderBottom: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}
                                     value={action.dueDate}
                                     onChange={(e) => onUpdateAction({...action, dueDate: e.target.value})}
                                 />
@@ -245,7 +274,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         </div>
                         <textarea
                             placeholder="Rationale..."
-                            className="w-full text-xs text-slate-600 bg-white/50 p-2 rounded mb-2 resize-none"
+                            className="w-full text-xs p-2 rounded mb-2 resize-none"
+                            style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)', opacity: 0.7 }}
                             value={action.rationale}
                             onChange={(e) => onUpdateAction({...action, rationale: e.target.value})}
                         />
@@ -253,7 +283,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                             value={action.status}
                             onChange={(e) => onUpdateAction({...action, status: e.target.value as ActionItem['status']})}
                             className="text-xs w-full border rounded p-1"
-                            style={{ borderColor: colors.border, color: colors.text }}
+                            style={{ borderColor: colors.border, color: colors.text, backgroundColor: 'var(--color-surface-primary)' }}
                         >
                             <option>Open</option>
                             <option>In Progress</option>
@@ -268,7 +298,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             return (
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                        <h3 className="text-sm font-bold text-slate-700">Actions Tracker</h3>
+                        <h3 className="text-sm font-bold" style={{ color: 'var(--color-text-secondary)' }}>Actions Tracker</h3>
                         <button
                             onClick={() => onAddAction({
                                 id: crypto.randomUUID(),
@@ -286,7 +316,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         </button>
                     </div>
 
-                    {nodeActions.length === 0 && <p className="text-xs text-slate-400 italic">No actions tracked for this cause yet.</p>}
+                    {nodeActions.length === 0 && <p className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>No actions tracked for this cause yet.</p>}
 
                     {activeActions.length > 0 && (
                         <div className="space-y-3">
@@ -296,9 +326,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
                     {activeActions.length > 0 && closedActions.length > 0 && (
                         <div className="flex items-center gap-2 py-1">
-                            <div className="flex-1 border-t border-slate-300" />
-                            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">Completed / Closed</span>
-                            <div className="flex-1 border-t border-slate-300" />
+                            <div className="flex-1" style={{ borderTop: '1px solid var(--color-border-secondary)' }} />
+                            <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--color-text-muted)' }}>Completed / Closed</span>
+                            <div className="flex-1" style={{ borderTop: '1px solid var(--color-border-secondary)' }} />
                         </div>
                     )}
 
@@ -315,8 +345,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         {activeTab === 'notes' && (
              <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-bold text-slate-700">Notes & Evidence</h3>
-                    <button 
+                    <h3 className="text-sm font-bold" style={{ color: 'var(--color-text-secondary)' }}>Notes & Evidence</h3>
+                    <button
                         onClick={() => onAddNote({
                             id: crypto.randomUUID(),
                             referenceId: selectedNode.id,
@@ -332,53 +362,54 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 </div>
 
                 <div className="space-y-3">
-                    {nodeNotes.length === 0 && <p className="text-xs text-slate-400 italic">No notes recorded.</p>}
+                    {nodeNotes.length === 0 && <p className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>No notes recorded.</p>}
                     {nodeNotes.map(note => (
-                        <div key={note.id} className={`bg-white p-3 rounded border shadow-sm text-sm relative ${note.isEvidence ? 'border-green-200 bg-green-50/30' : 'border-slate-200'}`}>
-                            <button 
+                        <div
+                            key={note.id}
+                            className="p-3 rounded border shadow-sm text-sm relative"
+                            style={{
+                                backgroundColor: note.isEvidence ? 'var(--color-status-ruled-out-bg)' : 'var(--color-surface-primary)',
+                                borderColor: note.isEvidence ? 'var(--color-status-ruled-out-border)' : 'var(--color-border-primary)',
+                            }}
+                        >
+                            <button
                                 onClick={() => onDeleteNote(note.id)}
-                                className="absolute top-2 right-2 text-slate-300 hover:text-red-400"
+                                className="absolute top-2 right-2 hover:text-red-400"
+                                style={{ color: 'var(--color-text-muted)' }}
                             >
                                 <XCircle size={12} />
                             </button>
-                            
+
                             <div className="flex items-center gap-2 mb-2">
-                                <span className="text-[10px] font-bold text-slate-400">{note.createdAt}</span>
+                                <span className="text-[10px] font-bold" style={{ color: 'var(--color-text-muted)' }}>{note.createdAt}</span>
                                 <label className="flex items-center gap-1 text-[10px] cursor-pointer select-none">
-                                    <input 
-                                        type="checkbox" 
+                                    <input
+                                        type="checkbox"
                                         checked={note.isEvidence}
                                         onChange={(e) => {
-                                            // Find note and update
                                             const updated = {...note, isEvidence: e.target.checked};
-                                            // We need to trigger a delete then add to update it in this simple filtering logic, 
-                                            // or better, just delete and add, but simpler: let parent handle
                                             onDeleteNote(note.id);
                                             onAddNote(updated);
                                         }}
                                         className="rounded text-green-600 focus:ring-green-500"
                                     />
-                                    <span className={note.isEvidence ? "text-green-700 font-semibold" : "text-slate-500"}>Mark as Evidence</span>
+                                    <span style={{ color: note.isEvidence ? 'var(--color-status-ruled-out-text)' : 'var(--color-text-tertiary)', fontWeight: note.isEvidence ? 600 : 400 }}>Mark as Evidence</span>
                                 </label>
                             </div>
-                            
-                            <textarea 
-                                className="w-full text-sm text-slate-700 bg-transparent outline-none resize-none"
+
+                            <textarea
+                                className="w-full text-sm bg-transparent outline-none resize-none"
+                                style={{ color: 'var(--color-text-secondary)' }}
                                 rows={3}
                                 placeholder="Type your note..."
                                 value={note.content}
                                 onChange={(e) => {
-                                     // This is a local edit in the text area, strictly speaking we should bubble up 
-                                     // but for smoother typing in this demo we might want to debounce or 
-                                     // just assume the user won't type 1000 wpm. 
-                                     // For this demo, let's just allow it but strictly we need an onUpdateNote prop.
-                                     // I'll skip adding a new prop to keep the interface simple and just "replace" the note
                                      const updated = {...note, content: e.target.value};
                                      onDeleteNote(note.id);
                                      onAddNote(updated);
                                 }}
                             />
-                            <div className="mt-1 text-xs text-slate-400 text-right">- {note.owner}</div>
+                            <div className="mt-1 text-xs text-right" style={{ color: 'var(--color-text-muted)' }}>- {note.owner}</div>
                         </div>
                     ))}
                 </div>

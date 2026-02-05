@@ -29,8 +29,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">All Investigations</h2>
-          <p className="text-sm text-slate-500">{trees.length} investigation{trees.length !== 1 ? 's' : ''}</p>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--color-text-primary)' }}>All Investigations</h2>
+          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{trees.length} investigation{trees.length !== 1 ? 's' : ''}</p>
         </div>
         {trees.length > 0 && (
           <button
@@ -45,16 +45,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Card grid */}
       {trees.length === 0 ? (
-        <div className="text-center text-slate-400 mt-20">
+        <div className="text-center mt-20" style={{ color: 'var(--color-text-muted)' }}>
           <p>No investigations yet. Create or import one using the dropdown above.</p>
         </div>
       ) : (() => {
         const ACTION_COLOR_MAP: Record<string, string> = {
-          'Open': '#f97316',
-          'In Progress': '#3b82f6',
-          'Complete': '#22c55e',
-          'Blocked': '#ef4444',
-          'Closed': '#94a3b8',
+          'Open': 'var(--color-action-open-text)',
+          'In Progress': 'var(--color-action-progress-text)',
+          'Complete': 'var(--color-action-complete-text)',
+          'Blocked': 'var(--color-action-blocked-text)',
+          'Closed': 'var(--color-action-closed-text)',
+        };
+
+        const ACTION_BORDER_MAP: Record<string, string> = {
+          'Open': 'var(--color-action-open-border)',
+          'In Progress': 'var(--color-action-progress-border)',
+          'Complete': 'var(--color-action-complete-border)',
+          'Blocked': 'var(--color-action-blocked-border)',
+          'Closed': 'var(--color-action-closed-border)',
         };
 
         // Determine if an investigation is "active" (has work in progress)
@@ -78,7 +86,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div
               key={tree.id}
               onClick={() => onSelectTree(tree.id)}
-              className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col"
+              className="rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col"
+              style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-primary)' }}
             >
               <div className="p-4 pb-3">
                 <div className="flex items-center gap-2 mb-1">
@@ -86,15 +95,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     className="w-3 h-3 rounded-full shrink-0"
                     style={{ backgroundColor: rootColors.border }}
                   />
-                  <h3 className="text-sm font-semibold text-slate-800 truncate">{tree.name}</h3>
+                  <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{tree.name}</h3>
                 </div>
-                <div className="text-xs text-slate-400">
+                <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                   Updated {formatDate(tree.updatedAt)}
                 </div>
               </div>
 
               <div className="px-4 pb-3">
-                <div className="text-xs font-medium text-slate-500 mb-1.5">Nodes</div>
+                <div className="text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Nodes</div>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.values(NodeStatus).map(status => {
                     const count = stats.nodesByStatus[status];
@@ -117,9 +126,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
               </div>
 
+              {stats.rootCauses.length > 0 && (
+                <div className="px-4 pb-2">
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
+                    style={{ backgroundColor: '#fffbeb', color: '#92400e', border: '1px solid #fcd34d' }}
+                  >
+                    {stats.rootCauses.length} Root Cause{stats.rootCauses.length !== 1 ? 's' : ''} Identified
+                  </span>
+                </div>
+              )}
+
               {stats.totalActions > 0 && (
                 <div className="px-4 pb-3">
-                  <div className="text-xs font-medium text-slate-500 mb-1.5">Actions</div>
+                  <div className="text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Actions</div>
                   <div className="flex flex-wrap gap-1.5">
                     {Object.entries(stats.actionsByStatus).map(([status, count]) => {
                       if (count === 0) return null;
@@ -128,9 +148,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           key={status}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
                           style={{
-                            backgroundColor: '#f8fafc',
-                            color: ACTION_COLOR_MAP[status] ?? '#64748b',
-                            border: `1px solid ${ACTION_COLOR_MAP[status] ?? '#cbd5e1'}`,
+                            backgroundColor: 'var(--color-surface-tertiary)',
+                            color: ACTION_COLOR_MAP[status] ?? 'var(--color-text-secondary)',
+                            border: `1px solid ${ACTION_BORDER_MAP[status] ?? 'var(--color-border-secondary)'}`,
                           }}
                         >
                           {count} {status}
@@ -141,13 +161,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
               )}
 
-              <div className="mt-auto px-4 py-2.5 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-xs text-slate-400">
+              <div className="mt-auto px-4 py-2.5 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
+                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                   {stats.totalNodes} node{stats.totalNodes !== 1 ? 's' : ''} · {stats.totalActions} action{stats.totalActions !== 1 ? 's' : ''}
                 </span>
                 <button
                   onClick={e => { e.stopPropagation(); onGenerateReport(tree.id); }}
-                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                  className="p-1.5 rounded transition-colors"
+                  style={{ color: 'var(--color-text-muted)' }}
                   title="Generate Report"
                 >
                   <FileText size={14} />
@@ -161,7 +182,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div>
             {activeTrees.length > 0 && (
               <>
-                <div className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-3">
+                <div className="text-xs uppercase tracking-wider font-semibold mb-3" style={{ color: 'var(--color-text-secondary)' }}>
                   Active Investigations ({activeTrees.length})
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -172,16 +193,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {activeTrees.length > 0 && inactiveTrees.length > 0 && (
               <div className="flex items-center gap-3 my-6">
-                <div className="flex-1 border-t border-slate-300" />
-                <span className="text-xs uppercase tracking-wider font-semibold text-slate-400">Inactive / Closed</span>
-                <div className="flex-1 border-t border-slate-300" />
+                <div className="flex-1" style={{ borderTop: '1px solid var(--color-border-secondary)' }} />
+                <span className="text-xs uppercase tracking-wider font-semibold" style={{ color: 'var(--color-text-muted)' }}>Inactive / Closed</span>
+                <div className="flex-1" style={{ borderTop: '1px solid var(--color-border-secondary)' }} />
               </div>
             )}
 
             {inactiveTrees.length > 0 && (
               <>
                 {activeTrees.length === 0 && (
-                  <div className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-3">
+                  <div className="text-xs uppercase tracking-wider font-semibold mb-3" style={{ color: 'var(--color-text-secondary)' }}>
                     Inactive / Closed ({inactiveTrees.length})
                   </div>
                 )}

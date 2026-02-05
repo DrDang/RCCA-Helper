@@ -3,11 +3,12 @@ import { TreeVisualizer } from './components/TreeVisualizer';
 import { InspectorPanel } from './components/InspectorPanel';
 import { TreeManager } from './components/TreeManager';
 import { DashboardView } from './components/DashboardView';
-import { CauseNode, ActionItem, Note, NodeStatus, NodeType, SavedTree } from './types';
+import { CauseNode, ActionItem, Note, NodeStatus, NodeType, SavedTree, AppSettings } from './types';
 import { createInitialTree } from './constants';
-import { loadAppState, saveAppState, exportTreeAsJson, exportAllTreesAsJson } from './persistence';
+import { loadAppState, saveAppState, exportTreeAsJson, exportAllTreesAsJson, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS } from './persistence';
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
-import { GitBranch, LayoutDashboard } from 'lucide-react';
+import { SettingsModal } from './components/SettingsModal';
+import { GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun } from 'lucide-react';
 
 const App: React.FC = () => {
   const [trees, setTrees] = useState<SavedTree[]>([]);
@@ -15,6 +16,10 @@ const App: React.FC = () => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [currentView, setCurrentView] = useState<'tree' | 'dashboard'>('tree');
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [showSettings, setShowSettings] = useState(false);
+  const [lastExportTimestamp, setLastExportTs] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -35,8 +40,60 @@ const App: React.FC = () => {
       setTrees([defaultTree]);
       setActiveTreeId(defaultTree.id);
     }
+    const savedSettings = loadSettings();
+    setSettings(savedSettings);
+    setLastExportTs(getLastExportTimestamp());
     setInitialized(true);
   }, []);
+
+  // Apply theme class to <html>
+  useEffect(() => {
+    const html = document.documentElement;
+    if (settings.theme === 'dark') {
+      html.classList.add('dark');
+    } else {
+      html.classList.remove('dark');
+    }
+  }, [settings.theme]);
+
+  // Track unsaved changes
+  useEffect(() => {
+    if (!initialized) return;
+    setHasUnsavedChanges(true);
+  }, [trees]);
+
+  // Auto-backup interval
+  useEffect(() => {
+    if (!settings.autoBackupEnabled || !initialized || trees.length === 0) return;
+    const intervalMs = settings.autoBackupIntervalMinutes * 60 * 1000;
+    const timer = setInterval(() => {
+      if (hasUnsavedChanges) {
+        const prefix = settings.projectFileName || 'RCCA_Backup';
+        const blob = new Blob([JSON.stringify(trees, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${prefix.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}_${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setLastExportTimestamp();
+        setLastExportTs(new Date().toISOString());
+        setHasUnsavedChanges(false);
+      }
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [settings.autoBackupEnabled, settings.autoBackupIntervalMinutes, settings.projectFileName, initialized, trees, hasUnsavedChanges]);
+
+  // beforeunload warning
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasUnsavedChanges]);
 
   // Debounced auto-save to localStorage
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -256,12 +313,33 @@ const App: React.FC = () => {
 
   const handleExportTree = (id: string) => {
     const tree = trees.find(t => t.id === id);
-    if (tree) exportTreeAsJson(tree);
+    if (tree) {
+      exportTreeAsJson(tree);
+      setLastExportTimestamp();
+      setLastExportTs(new Date().toISOString());
+      setHasUnsavedChanges(false);
+    }
   };
 
   const handleExportAll = () => {
     if (trees.length === 0) return;
     exportAllTreesAsJson(trees);
+    setLastExportTimestamp();
+    setLastExportTs(new Date().toISOString());
+    setHasUnsavedChanges(false);
+  };
+
+  const handleUpdateSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    saveSettings(newSettings);
+  };
+
+  const handleBackupNow = () => {
+    if (trees.length === 0) return;
+    exportAllTreesAsJson(trees);
+    setLastExportTimestamp();
+    setLastExportTs(new Date().toISOString());
+    setHasUnsavedChanges(false);
   };
 
   const handleImportAll = (imported: SavedTree[]) => {
@@ -289,16 +367,16 @@ const App: React.FC = () => {
   if (!initialized) return null;
 
   return (
-    <div className="w-screen h-screen flex flex-col overflow-hidden bg-slate-100">
+    <div className="w-screen h-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--color-surface-secondary)' }}>
       {/* Navbar */}
-      <div className="h-16 bg-white border-b border-slate-200 flex items-center px-6 justify-between shadow-sm z-30">
+      <div className="h-16 flex items-center px-6 justify-between shadow-sm z-30" style={{ backgroundColor: 'var(--color-surface-primary)', borderBottom: '1px solid var(--color-border-primary)' }}>
         <div className="flex items-center gap-3">
             <div className="bg-indigo-600 p-2 rounded-lg text-white">
                 <GitBranch size={24} />
             </div>
             <div>
-                <h1 className="text-xl font-bold text-slate-800 tracking-tight">RCCA Helper</h1>
-                <p className="text-xs text-slate-500">Root Cause Analysis & Action Tracking</p>
+                <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>RCCA Helper</h1>
+                <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>Root Cause Analysis & Action Tracking</p>
             </div>
         </div>
 
@@ -306,7 +384,8 @@ const App: React.FC = () => {
           {/* View toggle */}
           <button
             onClick={() => setCurrentView(currentView === 'tree' ? 'dashboard' : 'tree')}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+            style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
           >
             {currentView === 'tree' ? (
               <><LayoutDashboard size={16} /> Dashboard</>
@@ -314,6 +393,19 @@ const App: React.FC = () => {
               <><GitBranch size={16} /> Tree View</>
             )}
           </button>
+
+          {/* Report button - visible only in tree view */}
+          {currentView === 'tree' && activeTreeId && (
+            <button
+              onClick={() => handleGenerateReport(activeTreeId)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
+              title="Generate report for current investigation"
+            >
+              <FileText size={16} />
+              Report
+            </button>
+          )}
 
           {/* Tree Manager */}
           <TreeManager
@@ -331,12 +423,35 @@ const App: React.FC = () => {
             onGenerateBulkReport={handleGenerateBulkReport}
           />
 
+          {/* Theme toggle */}
+          <button
+            onClick={() => handleUpdateSettings({ ...settings, theme: settings.theme === 'light' ? 'dark' : 'light' })}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--color-text-muted)' }}
+            title={settings.theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          >
+            {settings.theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+
+          {/* Settings */}
+          <button
+            onClick={() => setShowSettings(true)}
+            className="p-2 rounded-lg transition-colors relative"
+            style={{ color: 'var(--color-text-muted)' }}
+            title="Settings"
+          >
+            <Settings size={18} />
+            {hasUnsavedChanges && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500" />
+            )}
+          </button>
+
           {/* Status legend */}
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <span className="w-3 h-3 rounded-full bg-slate-200 border border-slate-300"></span> Pending
-            <span className="w-3 h-3 rounded-full bg-orange-100 border border-orange-500"></span> Active
-            <span className="w-3 h-3 rounded-full bg-green-100 border border-green-500"></span> Ruled Out
-            <span className="w-3 h-3 rounded-full bg-red-100 border border-red-500"></span> Confirmed
+          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-status-pending-bg)', border: '1px solid var(--color-status-pending-border)' }}></span> Pending
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-status-active-bg)', border: '1px solid var(--color-status-active-border)' }}></span> Active
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-status-ruled-out-bg)', border: '1px solid var(--color-status-ruled-out-border)' }}></span> Ruled Out
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-status-confirmed-bg)', border: '1px solid var(--color-status-confirmed-border)' }}></span> Confirmed
           </div>
         </div>
       </div>
@@ -377,9 +492,19 @@ const App: React.FC = () => {
           />
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center text-slate-400">
+        <div className="flex-1 flex items-center justify-center" style={{ color: 'var(--color-text-muted)' }}>
           <p>No investigation selected. Create or import one using the dropdown above.</p>
         </div>
+      )}
+
+      {showSettings && (
+        <SettingsModal
+          settings={settings}
+          lastExportTimestamp={lastExportTimestamp}
+          onUpdateSettings={handleUpdateSettings}
+          onClose={() => setShowSettings(false)}
+          onBackupNow={handleBackupNow}
+        />
       )}
     </div>
   );
