@@ -13,6 +13,23 @@ import {
     User
 } from 'lucide-react';
 
+const ACTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  'Open': { bg: '#fff7ed', border: '#f97316', text: '#9a3412' },
+  'In Progress': { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af' },
+  'Complete': { bg: '#f0fdf4', border: '#22c55e', text: '#166534' },
+  'Blocked': { bg: '#fef2f2', border: '#ef4444', text: '#991b1b' },
+  'Closed': { bg: '#f8fafc', border: '#94a3b8', text: '#475569' },
+};
+
+// Active statuses float to top, terminal statuses sink to bottom
+const ACTION_STATUS_ORDER: Record<string, number> = {
+  'Blocked': 0,
+  'In Progress': 1,
+  'Open': 2,
+  'Complete': 3,
+  'Closed': 4,
+};
+
 interface InspectorPanelProps {
   selectedNode: CauseNode | null;
   actions: ActionItem[];
@@ -21,6 +38,7 @@ interface InspectorPanelProps {
   onDeleteNode: (nodeId: string) => void;
   onAddAction: (action: ActionItem) => void;
   onUpdateAction: (action: ActionItem) => void;
+  onDeleteAction: (actionId: string) => void;
   onAddNote: (note: Note) => void;
   onDeleteNote: (noteId: string) => void;
 }
@@ -33,6 +51,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   onDeleteNode,
   onAddAction,
   onUpdateAction,
+  onDeleteAction,
   onAddNote,
   onDeleteNote
 }) => {
@@ -176,77 +195,121 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         )}
 
         {/* RAIL TAB */}
-        {activeTab === 'rail' && (
-            <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-bold text-slate-700">Actions Tracker</h3>
-                    <button 
-                        onClick={() => onAddAction({
-                            id: crypto.randomUUID(),
-                            causeId: selectedNode.id,
-                            action: 'New Action',
-                            rationale: '',
-                            assignee: 'Unassigned',
-                            assignedDate: new Date().toISOString().split('T')[0],
-                            dueDate: '',
-                            status: 'Open'
-                        })}
-                        className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 flex items-center gap-1"
-                    >
-                        <Plus size={12} /> Add
-                    </button>
-                </div>
+        {activeTab === 'rail' && (() => {
+            const sorted = [...nodeActions].sort((a, b) =>
+              (ACTION_STATUS_ORDER[a.status] ?? 99) - (ACTION_STATUS_ORDER[b.status] ?? 99)
+            );
+            const activeActions = sorted.filter(a => a.status !== 'Complete' && a.status !== 'Closed');
+            const closedActions = sorted.filter(a => a.status === 'Complete' || a.status === 'Closed');
 
-                <div className="space-y-3">
-                    {nodeActions.length === 0 && <p className="text-xs text-slate-400 italic">No actions tracked for this cause yet.</p>}
-                    {nodeActions.map(action => (
-                        <div key={action.id} className="bg-white p-3 rounded border border-slate-200 shadow-sm text-sm">
-                            <input 
-                                className="font-semibold text-slate-800 w-full mb-2 bg-transparent focus:bg-slate-50 outline-none"
-                                value={action.action}
-                                onChange={(e) => onUpdateAction({...action, action: e.target.value})}
-                            />
-                            <div className="grid grid-cols-2 gap-2 mb-2">
-                                <div className="flex items-center gap-1 text-xs text-slate-500">
-                                    <User size={10} />
-                                    <input 
-                                        className="bg-transparent border-b border-slate-100 focus:border-indigo-500 outline-none w-full"
-                                        value={action.assignee}
-                                        onChange={(e) => onUpdateAction({...action, assignee: e.target.value})}
-                                        placeholder="Assignee"
-                                    />
-                                </div>
-                                <div className="flex items-center gap-1 text-xs text-slate-500">
-                                    <Calendar size={10} />
-                                    <input 
-                                        type="date"
-                                        className="bg-transparent border-b border-slate-100 focus:border-indigo-500 outline-none w-full"
-                                        value={action.dueDate}
-                                        onChange={(e) => onUpdateAction({...action, dueDate: e.target.value})}
-                                    />
-                                </div>
+            const renderActionCard = (action: ActionItem) => {
+                const colors = ACTION_STATUS_COLORS[action.status] ?? ACTION_STATUS_COLORS['Open'];
+                return (
+                    <div
+                        key={action.id}
+                        className="p-3 rounded border shadow-sm text-sm relative"
+                        style={{ backgroundColor: colors.bg, borderColor: colors.border }}
+                    >
+                        <button
+                            onClick={() => onDeleteAction(action.id)}
+                            className="absolute top-2 right-2 text-slate-300 hover:text-red-400"
+                            title="Delete Action"
+                        >
+                            <XCircle size={14} />
+                        </button>
+                        <input
+                            className="font-semibold w-full mb-2 bg-transparent focus:bg-white/50 outline-none pr-6"
+                            style={{ color: colors.text }}
+                            value={action.action}
+                            onChange={(e) => onUpdateAction({...action, action: e.target.value})}
+                        />
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                                <User size={10} />
+                                <input
+                                    className="bg-transparent border-b border-slate-200 focus:border-indigo-500 outline-none w-full"
+                                    value={action.assignee}
+                                    onChange={(e) => onUpdateAction({...action, assignee: e.target.value})}
+                                    placeholder="Assignee"
+                                />
                             </div>
-                            <textarea 
-                                placeholder="Rationale..."
-                                className="w-full text-xs text-slate-600 bg-slate-50 p-2 rounded mb-2 resize-none"
-                                value={action.rationale}
-                                onChange={(e) => onUpdateAction({...action, rationale: e.target.value})}
-                            />
-                            <select 
-                                value={action.status}
-                                onChange={(e) => onUpdateAction({...action, status: e.target.value as any})}
-                                className="text-xs w-full border border-slate-200 rounded p-1"
-                            >
-                                <option>Open</option>
-                                <option>In Progress</option>
-                                <option>Complete</option>
-                                <option>Blocked</option>
-                            </select>
+                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                                <Calendar size={10} />
+                                <input
+                                    type="date"
+                                    className="bg-transparent border-b border-slate-200 focus:border-indigo-500 outline-none w-full"
+                                    value={action.dueDate}
+                                    onChange={(e) => onUpdateAction({...action, dueDate: e.target.value})}
+                                />
+                            </div>
                         </div>
-                    ))}
+                        <textarea
+                            placeholder="Rationale..."
+                            className="w-full text-xs text-slate-600 bg-white/50 p-2 rounded mb-2 resize-none"
+                            value={action.rationale}
+                            onChange={(e) => onUpdateAction({...action, rationale: e.target.value})}
+                        />
+                        <select
+                            value={action.status}
+                            onChange={(e) => onUpdateAction({...action, status: e.target.value as ActionItem['status']})}
+                            className="text-xs w-full border rounded p-1"
+                            style={{ borderColor: colors.border, color: colors.text }}
+                        >
+                            <option>Open</option>
+                            <option>In Progress</option>
+                            <option>Complete</option>
+                            <option>Blocked</option>
+                            <option>Closed</option>
+                        </select>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-sm font-bold text-slate-700">Actions Tracker</h3>
+                        <button
+                            onClick={() => onAddAction({
+                                id: crypto.randomUUID(),
+                                causeId: selectedNode.id,
+                                action: 'New Action',
+                                rationale: '',
+                                assignee: 'Unassigned',
+                                assignedDate: new Date().toISOString().split('T')[0],
+                                dueDate: '',
+                                status: 'Open'
+                            })}
+                            className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 flex items-center gap-1"
+                        >
+                            <Plus size={12} /> Add
+                        </button>
+                    </div>
+
+                    {nodeActions.length === 0 && <p className="text-xs text-slate-400 italic">No actions tracked for this cause yet.</p>}
+
+                    {activeActions.length > 0 && (
+                        <div className="space-y-3">
+                            {activeActions.map(renderActionCard)}
+                        </div>
+                    )}
+
+                    {activeActions.length > 0 && closedActions.length > 0 && (
+                        <div className="flex items-center gap-2 py-1">
+                            <div className="flex-1 border-t border-slate-300" />
+                            <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">Completed / Closed</span>
+                            <div className="flex-1 border-t border-slate-300" />
+                        </div>
+                    )}
+
+                    {closedActions.length > 0 && (
+                        <div className="space-y-3">
+                            {closedActions.map(renderActionCard)}
+                        </div>
+                    )}
                 </div>
-            </div>
-        )}
+            );
+        })()}
 
         {/* NOTES TAB */}
         {activeTab === 'notes' && (

@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { SavedTree, NodeStatus } from '../types';
 import { STATUS_COLORS } from '../constants';
-import { importTreeFromJson } from '../persistence';
-import { ChevronDown, Plus, Upload, Download, Trash2, Pencil, Check, X } from 'lucide-react';
+import { importTreeFromJson, importAllTreesFromJson } from '../persistence';
+import { ChevronDown, Plus, Upload, Download, Trash2, Pencil, Check, X, PackageOpen, Package, FileText, FileStack } from 'lucide-react';
 
 interface TreeManagerProps {
   trees: SavedTree[];
@@ -13,6 +13,10 @@ interface TreeManagerProps {
   onRenameTree: (id: string, newName: string) => void;
   onImportTree: (tree: SavedTree) => void;
   onExportTree: (id: string) => void;
+  onExportAll: () => void;
+  onImportAll: (trees: SavedTree[]) => void;
+  onGenerateReport: (id: string) => void;
+  onGenerateBulkReport: () => void;
 }
 
 export const TreeManager: React.FC<TreeManagerProps> = ({
@@ -24,11 +28,16 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
   onRenameTree,
   onImportTree,
   onExportTree,
+  onExportAll,
+  onImportAll,
+  onGenerateReport,
+  onGenerateBulkReport,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bulkImportRef = useRef<HTMLInputElement>(null);
 
   const activeTree = trees.find(t => t.id === activeTreeId);
 
@@ -48,6 +57,18 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
   const handleCancelRename = () => {
     setRenamingId(null);
     setRenameValue('');
+  };
+
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const trees = await importAllTreesFromJson(file);
+      onImportAll(trees);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to import file');
+    }
+    e.target.value = '';
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,6 +191,13 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
                         <Pencil size={13} />
                       </button>
                       <button
+                        onClick={e => { e.stopPropagation(); onGenerateReport(tree.id); }}
+                        className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                        title="Report"
+                      >
+                        <FileText size={13} />
+                      </button>
+                      <button
                         onClick={e => { e.stopPropagation(); onExportTree(tree.id); }}
                         className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
                         title="Export"
@@ -207,12 +235,48 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
               </button>
             </div>
 
+            {/* Bulk actions */}
+            <div className="px-3 py-2.5 border-t border-slate-100 flex gap-2">
+              <button
+                onClick={() => { onExportAll(); }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                <Package size={15} />
+                Export All
+              </button>
+              <button
+                onClick={() => bulkImportRef.current?.click()}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                <PackageOpen size={15} />
+                Import All
+              </button>
+            </div>
+
+            {/* Report actions */}
+            <div className="px-3 py-2.5 border-t border-slate-100 flex gap-2">
+              <button
+                onClick={() => { onGenerateBulkReport(); }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+              >
+                <FileStack size={15} />
+                Report All
+              </button>
+            </div>
+
             <input
               ref={fileInputRef}
               type="file"
               accept=".json"
               className="hidden"
               onChange={handleImport}
+            />
+            <input
+              ref={bulkImportRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={handleBulkImport}
             />
           </div>
         </>

@@ -2,16 +2,19 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TreeVisualizer } from './components/TreeVisualizer';
 import { InspectorPanel } from './components/InspectorPanel';
 import { TreeManager } from './components/TreeManager';
+import { DashboardView } from './components/DashboardView';
 import { CauseNode, ActionItem, Note, NodeStatus, NodeType, SavedTree } from './types';
 import { createInitialTree } from './constants';
-import { loadAppState, saveAppState, exportTreeAsJson } from './persistence';
-import { GitBranch } from 'lucide-react';
+import { loadAppState, saveAppState, exportTreeAsJson, exportAllTreesAsJson } from './persistence';
+import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
+import { GitBranch, LayoutDashboard } from 'lucide-react';
 
 const App: React.FC = () => {
   const [trees, setTrees] = useState<SavedTree[]>([]);
   const [activeTreeId, setActiveTreeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [currentView, setCurrentView] = useState<'tree' | 'dashboard'>('tree');
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -184,6 +187,12 @@ const App: React.FC = () => {
       actions: tree.actions.map(a => a.id === updated.id ? updated : a)
     }));
   };
+  const handleDeleteAction = (id: string) => {
+    updateActiveTree(tree => ({
+      ...tree,
+      actions: tree.actions.filter(a => a.id !== id)
+    }));
+  };
 
   // Note Helpers
   const handleAddNote = (note: Note) => {
@@ -250,6 +259,33 @@ const App: React.FC = () => {
     if (tree) exportTreeAsJson(tree);
   };
 
+  const handleExportAll = () => {
+    if (trees.length === 0) return;
+    exportAllTreesAsJson(trees);
+  };
+
+  const handleImportAll = (imported: SavedTree[]) => {
+    const newTrees = imported.map(t => ({ ...t, id: crypto.randomUUID() }));
+    setTrees(prev => [...prev, ...newTrees]);
+    setActiveTreeId(newTrees[0].id);
+    setSelectedNodeId(null);
+  };
+
+  const handleGenerateReport = (id: string) => {
+    const tree = trees.find(t => t.id === id);
+    if (tree) openReportInNewTab(generateSingleReport(tree));
+  };
+
+  const handleGenerateBulkReport = () => {
+    if (trees.length > 0) openReportInNewTab(generateBulkReport(trees));
+  };
+
+  const handleDashboardSelectTree = (id: string) => {
+    setActiveTreeId(id);
+    setSelectedNodeId(null);
+    setCurrentView('tree');
+  };
+
   if (!initialized) return null;
 
   return (
@@ -267,16 +303,32 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-4">
+          {/* View toggle */}
+          <button
+            onClick={() => setCurrentView(currentView === 'tree' ? 'dashboard' : 'tree')}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
+          >
+            {currentView === 'tree' ? (
+              <><LayoutDashboard size={16} /> Dashboard</>
+            ) : (
+              <><GitBranch size={16} /> Tree View</>
+            )}
+          </button>
+
           {/* Tree Manager */}
           <TreeManager
             trees={trees}
             activeTreeId={activeTreeId}
-            onSelectTree={(id) => { setActiveTreeId(id); setSelectedNodeId(null); }}
+            onSelectTree={(id) => { setActiveTreeId(id); setSelectedNodeId(null); setCurrentView('tree'); }}
             onCreateTree={handleCreateTree}
             onDeleteTree={handleDeleteTree}
             onRenameTree={handleRenameTree}
             onImportTree={handleImportTree}
             onExportTree={handleExportTree}
+            onExportAll={handleExportAll}
+            onImportAll={handleImportAll}
+            onGenerateReport={handleGenerateReport}
+            onGenerateBulkReport={handleGenerateBulkReport}
           />
 
           {/* Status legend */}
@@ -290,7 +342,14 @@ const App: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      {treeData ? (
+      {currentView === 'dashboard' ? (
+        <DashboardView
+          trees={trees}
+          onSelectTree={handleDashboardSelectTree}
+          onGenerateReport={handleGenerateReport}
+          onGenerateBulkReport={handleGenerateBulkReport}
+        />
+      ) : treeData ? (
         <div className="flex-1 flex overflow-hidden relative">
           {/* Left: Visualization */}
           <div className="flex-1 h-full relative">
@@ -312,6 +371,7 @@ const App: React.FC = () => {
               onDeleteNode={deleteNode}
               onAddAction={handleAddAction}
               onUpdateAction={handleUpdateAction}
+              onDeleteAction={handleDeleteAction}
               onAddNote={handleAddNote}
               onDeleteNote={handleDeleteNote}
           />

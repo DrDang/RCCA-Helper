@@ -30,7 +30,7 @@ export interface ActionItem {
   assignee: string;
   assignedDate: string;
   dueDate: string;
-  status: 'Open' | 'In Progress' | 'Complete' | 'Blocked';
+  status: 'Open' | 'In Progress' | 'Complete' | 'Blocked' | 'Closed';
 }
 
 export interface Note {
