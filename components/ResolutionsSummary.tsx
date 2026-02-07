@@ -11,7 +11,9 @@ import {
     ChevronDown,
     ChevronUp,
     Filter,
-    AlertTriangle
+    AlertTriangle,
+    FileText,
+    ExternalLink
 } from 'lucide-react';
 
 const RESOLUTION_STATUSES: ResolutionStatus[] = [
@@ -34,6 +36,8 @@ interface ResolutionsSummaryProps {
   onAddResolution: (resolution: ResolutionItem) => void;
   onUpdateResolution: (resolution: ResolutionItem) => void;
   onDeleteResolution: (resolutionId: string) => void;
+  onNavigateToNode: (nodeId: string) => void;
+  onGenerateReport: () => void;
 }
 
 export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
@@ -42,7 +46,9 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
   treeName,
   onAddResolution,
   onUpdateResolution,
-  onDeleteResolution
+  onDeleteResolution,
+  onNavigateToNode,
+  onGenerateReport
 }) => {
   const [statusFilter, setStatusFilter] = useState<ResolutionStatus | 'all'>('all');
   const [expandedResolutionId, setExpandedResolutionId] = useState<string | null>(null);
@@ -175,13 +181,16 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
         {/* Linked root causes preview */}
         <div className="mt-2 flex flex-wrap gap-1">
           {resolution.linkedCauseIds.map(id => (
-            <span
+            <button
               key={id}
-              className="text-xs px-2 py-0.5 rounded"
+              onClick={() => onNavigateToNode(id)}
+              className="text-xs px-2 py-0.5 rounded flex items-center gap-1 hover:ring-2 hover:ring-indigo-400 transition-all cursor-pointer"
               style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
+              title="Click to view in tree"
             >
               {getRootCauseLabel(id)}
-            </span>
+              <ExternalLink size={10} />
+            </button>
           ))}
         </div>
 
@@ -290,27 +299,37 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
-              <Shield size={24} /> Resolutions Summary
+              <Shield size={24} /> Corrective Actions
             </h2>
             <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
-              {treeName}
+              {treeName} — Actions to fix confirmed root causes
             </p>
           </div>
-          <button
-            onClick={() => onAddResolution(createNewResolution())}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-            disabled={allRootCauses.length === 0}
-            title={allRootCauses.length === 0 ? 'Confirm at least one root cause first' : 'Add new resolution'}
-          >
-            <Plus size={16} /> Add Resolution
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onGenerateReport}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
+              title="Generate report for current investigation"
+            >
+              <FileText size={16} /> Report
+            </button>
+            <button
+              onClick={() => onAddResolution(createNewResolution())}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+              disabled={allRootCauses.length === 0}
+              title={allRootCauses.length === 0 ? 'Confirm at least one root cause first' : 'Add new corrective action'}
+            >
+              <Plus size={16} /> Add Action
+            </button>
+          </div>
         </div>
 
         {/* Stats cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-primary)' }}>
             <div className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{resolutions.length}</div>
-            <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Total Resolutions</div>
+            <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Total Actions</div>
           </div>
           <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-primary)' }}>
             <div className="text-2xl font-bold" style={{ color: statusCounts['In Progress'] > 0 ? 'var(--color-resolution-progress-text)' : 'var(--color-text-primary)' }}>
@@ -335,11 +354,21 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
           <div className="mb-6 p-4 rounded-lg border-2 border-amber-300 bg-amber-50">
             <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm mb-2">
               <AlertTriangle size={16} />
-              Root Causes Without Resolutions
+              Root Causes Without Corrective Actions
             </div>
             <ul className="text-sm text-amber-700 space-y-1">
               {rootCausesWithoutResolutions.map(rc => (
-                <li key={rc.id}>• {rc.label}</li>
+                <li key={rc.id} className="flex items-center gap-1">
+                  <span>•</span>
+                  <button
+                    onClick={() => onNavigateToNode(rc.id)}
+                    className="hover:underline flex items-center gap-1"
+                    title="Click to view in tree"
+                  >
+                    {rc.label}
+                    <ExternalLink size={10} />
+                  </button>
+                </li>
               ))}
             </ul>
           </div>

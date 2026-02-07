@@ -247,8 +247,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             onClick={() => setActiveTab('rail')}
             className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'rail' ? 'border-indigo-500 text-indigo-600' : 'border-transparent'}`}
             style={activeTab !== 'rail' ? { color: 'var(--color-text-tertiary)' } : undefined}
+            title="Investigation actions to verify or rule out this cause"
         >
-            RAIL ({nodeActions.length})
+            Investigate ({nodeActions.length})
         </button>
         <button
             onClick={() => setActiveTab('notes')}
@@ -262,8 +263,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               onClick={() => setActiveTab('resolutions')}
               className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'resolutions' ? 'border-indigo-500 text-indigo-600' : 'border-transparent'}`}
               style={activeTab !== 'resolutions' ? { color: 'var(--color-text-tertiary)' } : undefined}
+              title="Corrective actions to fix this root cause"
           >
-              Resolutions ({nodeResolutions.length})
+              Corrective ({nodeResolutions.length})
           </button>
         )}
       </div>
@@ -437,8 +439,11 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             return (
                 <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-sm font-bold" style={{ color: 'var(--color-text-secondary)' }}>Actions Tracker</h3>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <h3 className="text-sm font-bold" style={{ color: 'var(--color-text-secondary)' }}>Investigation Actions</h3>
+                            <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Tasks to verify or rule out this cause</p>
+                        </div>
                         <button
                             onClick={() => onAddAction({
                                 id: crypto.randomUUID(),
@@ -456,7 +461,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         </button>
                     </div>
 
-                    {nodeActions.length === 0 && <p className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>No actions tracked for this cause yet.</p>}
+                    {nodeActions.length === 0 && <p className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>No investigation actions for this cause yet.</p>}
 
                     {activeActions.length > 0 && (
                         <div className="space-y-3">
@@ -586,7 +591,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               updatedAt: new Date().toISOString()
             });
 
-            const renderResolutionCard = (resolution: ResolutionItem) => {
+            const renderResolutionCard = (resolution: ResolutionItem, displayIndex: number) => {
                 const colors = RESOLUTION_STATUS_COLORS[resolution.status] ?? RESOLUTION_STATUS_COLORS['Draft'];
                 const isExpanded = expandedResolutionId === resolution.id;
                 const linkedCauseCount = resolution.linkedCauseIds.length;
@@ -594,19 +599,26 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 return (
                     <div
                         key={resolution.id}
-                        className="p-3 rounded border shadow-sm text-sm"
+                        className="p-3 rounded border shadow-sm text-sm relative"
                         style={{ backgroundColor: colors.bg, borderColor: colors.border }}
                     >
                         {/* Header row */}
                         <div className="flex items-start justify-between gap-2 mb-2">
                             <input
-                                className="font-semibold flex-1 bg-transparent outline-none"
+                                className="font-semibold flex-1 bg-transparent outline-none pr-16"
                                 style={{ color: colors.text }}
                                 value={resolution.title}
                                 onChange={(e) => onUpdateResolution({...resolution, title: e.target.value})}
                                 placeholder="Resolution title..."
                             />
-                            <div className="flex items-center gap-1">
+                            <div className="absolute top-2 right-2 flex items-center gap-1">
+                                <span
+                                    className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                    style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-muted)' }}
+                                    title={`Resolution ID: ${displayIndex}`}
+                                >
+                                    #R{displayIndex}
+                                </span>
                                 <button
                                     onClick={() => setExpandedResolutionId(isExpanded ? null : resolution.id)}
                                     className="p-1 rounded hover:bg-black/10"
@@ -616,7 +628,11 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                     {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                 </button>
                                 <button
-                                    onClick={() => onDeleteResolution(resolution.id)}
+                                    onClick={() => {
+                                        if (window.confirm(`Delete resolution "${resolution.title}"? This cannot be undone.`)) {
+                                            onDeleteResolution(resolution.id);
+                                        }
+                                    }}
                                     className="p-1 rounded hover:text-red-400"
                                     style={{ color: 'var(--color-text-muted)' }}
                                     title="Delete Resolution"
@@ -766,10 +782,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             return (
                 <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--color-text-secondary)' }}>
-                            <Shield size={14} /> Resolutions
-                        </h3>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--color-text-secondary)' }}>
+                                <Shield size={14} /> Corrective Actions
+                            </h3>
+                            <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Actions to fix this confirmed root cause</p>
+                        </div>
                         <button
                             onClick={() => onAddResolution(createNewResolution())}
                             className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 flex items-center gap-1"
@@ -780,13 +799,16 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
                     {nodeResolutions.length === 0 && (
                         <p className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>
-                            No resolutions defined for this root cause yet.
+                            No corrective actions defined for this root cause yet.
                         </p>
                     )}
 
                     {activeResolutions.length > 0 && (
                         <div className="space-y-3">
-                            {activeResolutions.map(renderResolutionCard)}
+                            {activeResolutions.map(resolution => {
+                                const displayIndex = nodeResolutions.indexOf(resolution) + 1;
+                                return renderResolutionCard(resolution, displayIndex);
+                            })}
                         </div>
                     )}
 
@@ -800,7 +822,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
                     {closedResolutions.length > 0 && (
                         <div className="space-y-3">
-                            {closedResolutions.map(renderResolutionCard)}
+                            {closedResolutions.map(resolution => {
+                                const displayIndex = nodeResolutions.indexOf(resolution) + 1;
+                                return renderResolutionCard(resolution, displayIndex);
+                            })}
                         </div>
                     )}
                 </div>

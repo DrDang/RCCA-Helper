@@ -1,13 +1,16 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import { CauseNode, ActionItem, NodeStatus } from '../types';
+import html2canvas from 'html2canvas';
+import { CauseNode, ActionItem, NodeStatus, ResolutionItem } from '../types';
 import { CARD_WIDTH, CARD_HEIGHT, STATUS_COLORS } from '../constants';
-import { Plus, Move, ClipboardList, Crosshair } from 'lucide-react';
+import { Plus, Move, ClipboardList, Crosshair, Shield, Download } from 'lucide-react';
 
 interface TreeVisualizerProps {
   data: CauseNode;
   selectedId: string | null;
   actions: ActionItem[];
+  resolutions: ResolutionItem[];
+  treeName?: string;
   onSelectNode: (node: CauseNode) => void;
   onAddNode: (parentId: string) => void;
 }
@@ -16,6 +19,8 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   data,
   selectedId,
   actions,
+  resolutions,
+  treeName = 'fault-tree',
   onSelectNode,
   onAddNode
 }) => {
@@ -32,6 +37,17 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     }
     return set;
   }, [actions]);
+
+  // Build a set of node IDs that have resolutions linked
+  const nodesWithResolutions = useMemo(() => {
+    const set = new Set<string>();
+    for (const resolution of resolutions) {
+      for (const causeId of resolution.linkedCauseIds) {
+        set.add(causeId);
+      }
+    }
+    return set;
+  }, [resolutions]);
 
   // Process data with D3
   const { nodes, links } = useMemo(() => {
@@ -85,6 +101,43 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
       .call(zoomRef.current.transform, d3.zoomIdentity.translate(initialX, initialY).scale(0.8));
   };
 
+  // Export tree as PNG image
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportImage = async () => {
+    if (!containerRef.current || isExporting) return;
+
+    setIsExporting(true);
+
+    try {
+      // Hide the toolbar buttons during capture
+      const toolbar = containerRef.current.querySelector('.absolute.top-4.left-4') as HTMLElement;
+      if (toolbar) toolbar.style.display = 'none';
+
+      // Capture the visible container
+      const canvas = await html2canvas(containerRef.current, {
+        backgroundColor: '#f8fafc',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+      });
+
+      // Restore toolbar
+      if (toolbar) toolbar.style.display = 'flex';
+
+      // Download the image
+      const link = document.createElement('a');
+      link.download = `${treeName.replace(/[^a-z0-9]/gi, '_')}_tree.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (error) {
+      console.error('Failed to export image:', error);
+      alert('Failed to export image. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Render Logic using curved paths for standard tree look
   const generatePath = (link: d3.HierarchyLink<CauseNode>) => {
     const sourceX = link.source.x + CARD_WIDTH / 2;
@@ -112,6 +165,15 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         >
           <Crosshair size={14} /> Re-center
         </button>
+        <button
+          onClick={handleExportImage}
+          disabled={isExporting}
+          className="backdrop-blur p-2 rounded shadow text-xs flex items-center gap-2 hover:opacity-100 transition-opacity disabled:opacity-50"
+          style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)', opacity: 0.8 }}
+          title="Export visible tree view as PNG (pan/zoom to frame first)"
+        >
+          <Download size={14} /> {isExporting ? 'Exporting...' : 'Export Image'}
+        </button>
       </div>
 
       <svg ref={svgRef} className="w-full h-full">
@@ -138,6 +200,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             const styles = STATUS_COLORS[node.data.status];
             const isSelected = node.data.id === selectedId;
             const hasActions = nodesWithActions.has(node.data.id);
+            const hasResolutions = nodesWithResolutions.has(node.data.id);
 
             return (
               <foreignObject
@@ -176,14 +239,25 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                   {hasActions && (
                     <div
                       className="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-indigo-500 border border-white shadow-sm flex items-center justify-center"
-                      title="Has actions assigned"
+                      title="Has investigation actions"
                     >
                       <ClipboardList size={10} className="text-white" />
                     </div>
                   )}
 
-                  <div>
-                    <h3 className="font-bold text-sm truncate" title={node.data.label}>
+                  {/* Resolution indicator badge */}
+                  {hasResolutions && (
+                    <div
+                      className="absolute -top-2 w-5 h-5 rounded-full bg-emerald-500 border border-white shadow-sm flex items-center justify-center"
+                      style={{ left: hasActions ? '18px' : '-8px' }}
+                      title="Has corrective actions"
+                    >
+                      <Shield size={10} className="text-white" />
+                    </div>
+                  )}
+
+                  <div className="min-h-0 flex-1 overflow-hidden">
+                    <h3 className="font-bold text-sm leading-tight" style={{ wordBreak: 'break-word' }}>
                       {node.data.label}
                     </h3>
                     <p className="text-xs opacity-80 mt-1 line-clamp-2">

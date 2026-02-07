@@ -88,16 +88,8 @@ const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [settings.autoBackupEnabled, settings.autoBackupIntervalMinutes, settings.projectFileName, initialized, trees, hasUnsavedChanges]);
 
-  // beforeunload warning
-  useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-      }
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [hasUnsavedChanges]);
+  // Note: No beforeunload warning needed since data is auto-saved to localStorage.
+  // Users can export to JSON files for sharing or backup purposes.
 
   // Debounced auto-save to localStorage
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -406,6 +398,12 @@ const App: React.FC = () => {
     setCurrentView('tree');
   };
 
+  const handleNavigateToNode = (nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    setCurrentView('tree');
+    setInspectorOpen(true);
+  };
+
   if (!initialized) return null;
 
   return (
@@ -443,9 +441,9 @@ const App: React.FC = () => {
               onClick={() => setCurrentView('resolutions')}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${currentView === 'resolutions' ? 'bg-indigo-600 text-white' : ''}`}
               style={currentView !== 'resolutions' ? { backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)', borderLeft: '1px solid var(--color-border-primary)' } : { borderLeft: '1px solid var(--color-border-primary)' }}
-              title="View all resolutions for current investigation"
+              title="View all corrective actions for current investigation"
             >
-              <Shield size={14} /> Resolutions
+              <Shield size={14} /> Corrective
             </button>
           </div>
 
@@ -528,6 +526,8 @@ const App: React.FC = () => {
             onAddResolution={handleAddResolution}
             onUpdateResolution={handleUpdateResolution}
             onDeleteResolution={handleDeleteResolution}
+            onNavigateToNode={handleNavigateToNode}
+            onGenerateReport={() => handleGenerateReport(activeTree.id)}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center" style={{ color: 'var(--color-text-muted)' }}>
@@ -542,6 +542,8 @@ const App: React.FC = () => {
                   data={treeData}
                   selectedId={selectedNodeId}
                   actions={actions}
+                  resolutions={resolutions}
+                  treeName={activeTree?.name}
                   onSelectNode={(node) => setSelectedNodeId(node.id)}
                   onAddNode={addChildNode}
               />
