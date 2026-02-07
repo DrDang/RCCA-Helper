@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ActionItem, CauseNode, Note, NodeStatus, NodeType } from '../types';
-import { STATUS_COLORS } from '../constants';
+import { ActionItem, CauseNode, Note, NodeStatus, NodeType, ResolutionItem, ResolutionStatus } from '../types';
+import { STATUS_COLORS, RESOLUTION_STATUS_COLORS } from '../constants';
 import {
     ClipboardList,
     StickyNote,
@@ -10,7 +10,11 @@ import {
     Plus,
     Trash2,
     Calendar,
-    User
+    User,
+    Shield,
+    Link2,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
 
 const ACTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -30,10 +34,26 @@ const ACTION_STATUS_ORDER: Record<string, number> = {
   'Closed': 4,
 };
 
+// Resolution status order: active on top, terminal at bottom
+const RESOLUTION_STATUS_ORDER: Record<string, number> = {
+  'In Progress': 0,
+  'Approved': 1,
+  'Draft': 2,
+  'Implemented': 3,
+  'Verified': 4,
+  'Closed': 5,
+};
+
+const RESOLUTION_STATUSES: ResolutionStatus[] = [
+  'Draft', 'Approved', 'In Progress', 'Implemented', 'Verified', 'Closed'
+];
+
 interface InspectorPanelProps {
   selectedNode: CauseNode | null;
   actions: ActionItem[];
   notes: Note[];
+  resolutions: ResolutionItem[];
+  allRootCauses: CauseNode[];
   onUpdateNode: (updatedNode: CauseNode) => void;
   onDeleteNode: (nodeId: string) => void;
   onAddAction: (action: ActionItem) => void;
@@ -41,21 +61,30 @@ interface InspectorPanelProps {
   onDeleteAction: (actionId: string) => void;
   onAddNote: (note: Note) => void;
   onDeleteNote: (noteId: string) => void;
+  onAddResolution: (resolution: ResolutionItem) => void;
+  onUpdateResolution: (resolution: ResolutionItem) => void;
+  onDeleteResolution: (resolutionId: string) => void;
 }
 
 export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   selectedNode,
   actions,
   notes,
+  resolutions,
+  allRootCauses,
   onUpdateNode,
   onDeleteNode,
   onAddAction,
   onUpdateAction,
   onDeleteAction,
   onAddNote,
-  onDeleteNote
+  onDeleteNote,
+  onAddResolution,
+  onUpdateResolution,
+  onDeleteResolution
 }) => {
-  const [activeTab, setActiveTab] = useState<'details' | 'rail' | 'notes'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'rail' | 'notes' | 'resolutions'>('details');
+  const [expandedResolutionId, setExpandedResolutionId] = useState<string | null>(null);
 
   if (!selectedNode) {
     return (
@@ -70,6 +99,12 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   // Filter items for this node
   const nodeActions = actions.filter(a => a.causeId === selectedNode.id);
   const nodeNotes = notes.filter(n => n.referenceId === selectedNode.id);
+
+  // Check if this is a root cause node (for showing Resolutions tab)
+  const isRootCauseNode = selectedNode.status === NodeStatus.CONFIRMED && selectedNode.isRootCause === true;
+
+  // Filter resolutions linked to this node
+  const nodeResolutions = resolutions.filter(r => r.linkedCauseIds.includes(selectedNode.id));
 
   const handleStatusChange = (newStatus: NodeStatus) => {
     if (newStatus === NodeStatus.RULED_OUT) {
@@ -128,6 +163,15 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         >
             Notes ({nodeNotes.length})
         </button>
+        {isRootCauseNode && (
+          <button
+              onClick={() => setActiveTab('resolutions')}
+              className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'resolutions' ? 'border-indigo-500 text-indigo-600' : 'border-transparent'}`}
+              style={activeTab !== 'resolutions' ? { color: 'var(--color-text-tertiary)' } : undefined}
+          >
+              Resolutions ({nodeResolutions.length})
+          </button>
+        )}
       </div>
 
       {/* Content Area */}
@@ -415,6 +459,251 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                 </div>
             </div>
         )}
+
+        {/* RESOLUTIONS TAB */}
+        {activeTab === 'resolutions' && isRootCauseNode && (() => {
+            const sorted = [...nodeResolutions].sort((a, b) =>
+              (RESOLUTION_STATUS_ORDER[a.status] ?? 99) - (RESOLUTION_STATUS_ORDER[b.status] ?? 99)
+            );
+            const activeResolutions = sorted.filter(r => r.status !== 'Verified' && r.status !== 'Closed');
+            const closedResolutions = sorted.filter(r => r.status === 'Verified' || r.status === 'Closed');
+
+            const createNewResolution = (): ResolutionItem => ({
+              id: crypto.randomUUID(),
+              linkedCauseIds: [selectedNode.id],
+              title: 'New Resolution',
+              description: '',
+              owner: 'Unassigned',
+              targetDate: '',
+              implementedDate: '',
+              verificationMethod: '',
+              verificationResults: '',
+              verifiedDate: '',
+              status: 'Draft',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+
+            const renderResolutionCard = (resolution: ResolutionItem) => {
+                const colors = RESOLUTION_STATUS_COLORS[resolution.status] ?? RESOLUTION_STATUS_COLORS['Draft'];
+                const isExpanded = expandedResolutionId === resolution.id;
+                const linkedCauseCount = resolution.linkedCauseIds.length;
+
+                return (
+                    <div
+                        key={resolution.id}
+                        className="p-3 rounded border shadow-sm text-sm"
+                        style={{ backgroundColor: colors.bg, borderColor: colors.border }}
+                    >
+                        {/* Header row */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                            <input
+                                className="font-semibold flex-1 bg-transparent outline-none"
+                                style={{ color: colors.text }}
+                                value={resolution.title}
+                                onChange={(e) => onUpdateResolution({...resolution, title: e.target.value})}
+                                placeholder="Resolution title..."
+                            />
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setExpandedResolutionId(isExpanded ? null : resolution.id)}
+                                    className="p-1 rounded hover:bg-black/10"
+                                    style={{ color: 'var(--color-text-muted)' }}
+                                    title={isExpanded ? 'Collapse' : 'Expand'}
+                                >
+                                    {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                </button>
+                                <button
+                                    onClick={() => onDeleteResolution(resolution.id)}
+                                    className="p-1 rounded hover:text-red-400"
+                                    style={{ color: 'var(--color-text-muted)' }}
+                                    title="Delete Resolution"
+                                >
+                                    <XCircle size={14} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Summary row */}
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                            <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                                <User size={10} />
+                                <input
+                                    className="bg-transparent outline-none w-full"
+                                    style={{ borderBottom: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}
+                                    value={resolution.owner}
+                                    onChange={(e) => onUpdateResolution({...resolution, owner: e.target.value})}
+                                    placeholder="Owner"
+                                />
+                            </div>
+                            <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                                <Calendar size={10} />
+                                <input
+                                    type="date"
+                                    className="bg-transparent outline-none w-full"
+                                    style={{ borderBottom: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}
+                                    value={resolution.targetDate}
+                                    onChange={(e) => onUpdateResolution({...resolution, targetDate: e.target.value})}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Linked causes indicator */}
+                        <div className="flex items-center gap-1 text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                            <Link2 size={10} />
+                            <span>{linkedCauseCount} linked root cause{linkedCauseCount !== 1 ? 's' : ''}</span>
+                        </div>
+
+                        {/* Status dropdown */}
+                        <select
+                            value={resolution.status}
+                            onChange={(e) => onUpdateResolution({...resolution, status: e.target.value as ResolutionStatus})}
+                            className="text-xs w-full border rounded p-1 mb-2"
+                            style={{ borderColor: colors.border, color: colors.text, backgroundColor: 'var(--color-surface-primary)' }}
+                        >
+                            {RESOLUTION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+
+                        {/* Expanded content */}
+                        {isExpanded && (
+                            <div className="space-y-3 pt-2" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
+                                <div>
+                                    <label className="text-[10px] uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Description</label>
+                                    <textarea
+                                        className="w-full text-xs p-2 rounded resize-none mt-1"
+                                        style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)' }}
+                                        rows={2}
+                                        value={resolution.description}
+                                        onChange={(e) => onUpdateResolution({...resolution, description: e.target.value})}
+                                        placeholder="Describe the corrective action..."
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Verification Method</label>
+                                    <textarea
+                                        className="w-full text-xs p-2 rounded resize-none mt-1"
+                                        style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)' }}
+                                        rows={2}
+                                        value={resolution.verificationMethod}
+                                        onChange={(e) => onUpdateResolution({...resolution, verificationMethod: e.target.value})}
+                                        placeholder="How will effectiveness be verified?"
+                                    />
+                                </div>
+
+                                {(resolution.status === 'Implemented' || resolution.status === 'Verified' || resolution.status === 'Closed') && (
+                                    <>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="text-[10px] uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Implemented Date</label>
+                                                <input
+                                                    type="date"
+                                                    className="w-full text-xs p-1 rounded mt-1"
+                                                    style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-primary)' }}
+                                                    value={resolution.implementedDate}
+                                                    onChange={(e) => onUpdateResolution({...resolution, implementedDate: e.target.value})}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Verified Date</label>
+                                                <input
+                                                    type="date"
+                                                    className="w-full text-xs p-1 rounded mt-1"
+                                                    style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-primary)' }}
+                                                    value={resolution.verifiedDate}
+                                                    onChange={(e) => onUpdateResolution({...resolution, verifiedDate: e.target.value})}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Verification Results</label>
+                                            <textarea
+                                                className="w-full text-xs p-2 rounded resize-none mt-1"
+                                                style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)' }}
+                                                rows={2}
+                                                value={resolution.verificationResults}
+                                                onChange={(e) => onUpdateResolution({...resolution, verificationResults: e.target.value})}
+                                                placeholder="Document verification results..."
+                                            />
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Link to other root causes */}
+                                {allRootCauses.length > 1 && (
+                                    <div>
+                                        <label className="text-[10px] uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Link to Root Causes</label>
+                                        <div className="mt-1 space-y-1">
+                                            {allRootCauses.map(rc => (
+                                                <label key={rc.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={resolution.linkedCauseIds.includes(rc.id)}
+                                                        onChange={(e) => {
+                                                            const newLinked = e.target.checked
+                                                                ? [...resolution.linkedCauseIds, rc.id]
+                                                                : resolution.linkedCauseIds.filter(id => id !== rc.id);
+                                                            if (newLinked.length > 0) {
+                                                                onUpdateResolution({...resolution, linkedCauseIds: newLinked});
+                                                            }
+                                                        }}
+                                                        className="rounded"
+                                                        disabled={resolution.linkedCauseIds.length === 1 && resolution.linkedCauseIds[0] === rc.id}
+                                                    />
+                                                    <span style={{ color: 'var(--color-text-secondary)' }}>{rc.label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
+            return (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--color-text-secondary)' }}>
+                            <Shield size={14} /> Resolutions
+                        </h3>
+                        <button
+                            onClick={() => onAddResolution(createNewResolution())}
+                            className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 flex items-center gap-1"
+                        >
+                            <Plus size={12} /> Add
+                        </button>
+                    </div>
+
+                    {nodeResolutions.length === 0 && (
+                        <p className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>
+                            No resolutions defined for this root cause yet.
+                        </p>
+                    )}
+
+                    {activeResolutions.length > 0 && (
+                        <div className="space-y-3">
+                            {activeResolutions.map(renderResolutionCard)}
+                        </div>
+                    )}
+
+                    {activeResolutions.length > 0 && closedResolutions.length > 0 && (
+                        <div className="flex items-center gap-2 py-1">
+                            <div className="flex-1" style={{ borderTop: '1px solid var(--color-border-secondary)' }} />
+                            <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--color-text-muted)' }}>Verified / Closed</span>
+                            <div className="flex-1" style={{ borderTop: '1px solid var(--color-border-secondary)' }} />
+                        </div>
+                    )}
+
+                    {closedResolutions.length > 0 && (
+                        <div className="space-y-3">
+                            {closedResolutions.map(renderResolutionCard)}
+                        </div>
+                    )}
+                </div>
+            );
+        })()}
 
       </div>
     </div>

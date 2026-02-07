@@ -33,11 +33,24 @@ export function setLastExportTimestamp(): void {
   localStorage.setItem(LAST_EXPORT_KEY, new Date().toISOString());
 }
 
+// Ensure backward compatibility by adding resolutions array if missing
+function migrateTree(tree: SavedTree): SavedTree {
+  return {
+    ...tree,
+    resolutions: tree.resolutions ?? []
+  };
+}
+
 export function loadAppState(): AppState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as AppState;
+    const state = JSON.parse(raw) as AppState;
+    // Migrate all trees to ensure resolutions array exists
+    return {
+      ...state,
+      trees: state.trees.map(migrateTree)
+    };
   } catch {
     return null;
   }
@@ -73,7 +86,8 @@ export function importAllTreesFromJson(file: File): Promise<SavedTree[]> {
             return;
           }
         }
-        resolve(data as SavedTree[]);
+        // Migrate all trees for backward compatibility
+        resolve((data as SavedTree[]).map(migrateTree));
       } catch {
         reject(new Error('Failed to parse JSON file'));
       }
@@ -103,7 +117,8 @@ export function importTreeFromJson(file: File): Promise<SavedTree> {
           reject(new Error('Invalid tree file format'));
           return;
         }
-        resolve(data);
+        // Migrate tree for backward compatibility
+        resolve(migrateTree(data));
       } catch {
         reject(new Error('Failed to parse JSON file'));
       }

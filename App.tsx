@@ -3,19 +3,20 @@ import { TreeVisualizer } from './components/TreeVisualizer';
 import { InspectorPanel } from './components/InspectorPanel';
 import { TreeManager } from './components/TreeManager';
 import { DashboardView } from './components/DashboardView';
-import { CauseNode, ActionItem, Note, NodeStatus, NodeType, SavedTree, AppSettings } from './types';
+import { ResolutionsSummary } from './components/ResolutionsSummary';
+import { CauseNode, ActionItem, Note, NodeStatus, NodeType, SavedTree, AppSettings, ResolutionItem } from './types';
 import { createInitialTree } from './constants';
 import { loadAppState, saveAppState, exportTreeAsJson, exportAllTreesAsJson, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS } from './persistence';
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
 import { SettingsModal } from './components/SettingsModal';
-import { GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun } from 'lucide-react';
+import { GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun, Shield } from 'lucide-react';
 
 const App: React.FC = () => {
   const [trees, setTrees] = useState<SavedTree[]>([]);
   const [activeTreeId, setActiveTreeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
-  const [currentView, setCurrentView] = useState<'tree' | 'dashboard'>('tree');
+  const [currentView, setCurrentView] = useState<'tree' | 'dashboard' | 'resolutions'>('tree');
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [lastExportTimestamp, setLastExportTs] = useState<string | null>(null);
@@ -35,7 +36,8 @@ const App: React.FC = () => {
         updatedAt: new Date().toISOString(),
         treeData: createInitialTree(),
         actions: [],
-        notes: []
+        notes: [],
+        resolutions: []
       };
       setTrees([defaultTree]);
       setActiveTreeId(defaultTree.id);
@@ -113,6 +115,21 @@ const App: React.FC = () => {
   const treeData = activeTree?.treeData ?? null;
   const actions = activeTree?.actions ?? [];
   const notes = activeTree?.notes ?? [];
+  const resolutions = activeTree?.resolutions ?? [];
+
+  // Flatten tree to get all root causes for resolution linking
+  const flattenTree = (node: CauseNode): CauseNode[] => {
+    const result = [node];
+    if (node.children) {
+      for (const child of node.children) {
+        result.push(...flattenTree(child));
+      }
+    }
+    return result;
+  };
+  const allRootCauses = treeData
+    ? flattenTree(treeData).filter(n => n.isRootCause === true)
+    : [];
 
   // Helper to update the active tree within the trees array
   const updateActiveTree = useCallback((updater: (tree: SavedTree) => SavedTree) => {
@@ -265,6 +282,28 @@ const App: React.FC = () => {
     }));
   };
 
+  // Resolution Helpers
+  const handleAddResolution = (resolution: ResolutionItem) => {
+    updateActiveTree(tree => ({
+      ...tree,
+      resolutions: [...(tree.resolutions ?? []), resolution]
+    }));
+  };
+  const handleUpdateResolution = (updated: ResolutionItem) => {
+    updateActiveTree(tree => ({
+      ...tree,
+      resolutions: (tree.resolutions ?? []).map(r =>
+        r.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : r
+      )
+    }));
+  };
+  const handleDeleteResolution = (id: string) => {
+    updateActiveTree(tree => ({
+      ...tree,
+      resolutions: (tree.resolutions ?? []).filter(r => r.id !== id)
+    }));
+  };
+
   // Tree management handlers
   const handleCreateTree = () => {
     const name = prompt('Investigation name:', 'New Investigation');
@@ -276,7 +315,8 @@ const App: React.FC = () => {
       updatedAt: new Date().toISOString(),
       treeData: createInitialTree(name),
       actions: [],
-      notes: []
+      notes: [],
+      resolutions: []
     };
     setTrees(prev => [...prev, newTree]);
     setActiveTreeId(newTree.id);
@@ -381,18 +421,31 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* View toggle */}
-          <button
-            onClick={() => setCurrentView(currentView === 'tree' ? 'dashboard' : 'tree')}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-            style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
-          >
-            {currentView === 'tree' ? (
-              <><LayoutDashboard size={16} /> Dashboard</>
-            ) : (
-              <><GitBranch size={16} /> Tree View</>
-            )}
-          </button>
+          {/* View toggles */}
+          <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--color-border-primary)' }}>
+            <button
+              onClick={() => setCurrentView('tree')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${currentView === 'tree' ? 'bg-indigo-600 text-white' : ''}`}
+              style={currentView !== 'tree' ? { backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' } : undefined}
+            >
+              <GitBranch size={14} /> Tree
+            </button>
+            <button
+              onClick={() => setCurrentView('dashboard')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${currentView === 'dashboard' ? 'bg-indigo-600 text-white' : ''}`}
+              style={currentView !== 'dashboard' ? { backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)', borderLeft: '1px solid var(--color-border-primary)' } : { borderLeft: '1px solid var(--color-border-primary)' }}
+            >
+              <LayoutDashboard size={14} /> Dashboard
+            </button>
+            <button
+              onClick={() => setCurrentView('resolutions')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${currentView === 'resolutions' ? 'bg-indigo-600 text-white' : ''}`}
+              style={currentView !== 'resolutions' ? { backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)', borderLeft: '1px solid var(--color-border-primary)' } : { borderLeft: '1px solid var(--color-border-primary)' }}
+              title="View all resolutions for current investigation"
+            >
+              <Shield size={14} /> Resolutions
+            </button>
+          </div>
 
           {/* Report button - visible only in tree view */}
           {currentView === 'tree' && activeTreeId && (
@@ -464,6 +517,21 @@ const App: React.FC = () => {
           onGenerateReport={handleGenerateReport}
           onGenerateBulkReport={handleGenerateBulkReport}
         />
+      ) : currentView === 'resolutions' ? (
+        activeTree ? (
+          <ResolutionsSummary
+            resolutions={resolutions}
+            allRootCauses={allRootCauses}
+            treeName={activeTree.name}
+            onAddResolution={handleAddResolution}
+            onUpdateResolution={handleUpdateResolution}
+            onDeleteResolution={handleDeleteResolution}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center" style={{ color: 'var(--color-text-muted)' }}>
+            <p>No investigation selected. Create or import one using the dropdown above.</p>
+          </div>
+        )
       ) : treeData ? (
         <div className="flex-1 flex overflow-hidden relative">
           {/* Left: Visualization */}
@@ -482,6 +550,8 @@ const App: React.FC = () => {
               selectedNode={getSelectedNode()}
               actions={actions}
               notes={notes}
+              resolutions={resolutions}
+              allRootCauses={allRootCauses}
               onUpdateNode={handleUpdateNode}
               onDeleteNode={deleteNode}
               onAddAction={handleAddAction}
@@ -489,6 +559,9 @@ const App: React.FC = () => {
               onDeleteAction={handleDeleteAction}
               onAddNote={handleAddNote}
               onDeleteNote={handleDeleteNote}
+              onAddResolution={handleAddResolution}
+              onUpdateResolution={handleUpdateResolution}
+              onDeleteResolution={handleDeleteResolution}
           />
         </div>
       ) : (

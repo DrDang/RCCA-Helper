@@ -43,6 +43,30 @@ export interface Note {
   isEvidence: boolean; // True if this note serves as evidence for ruling out
 }
 
+export type ResolutionStatus =
+  | 'Draft'        // Being defined
+  | 'Approved'     // Ready for implementation
+  | 'In Progress'  // Implementation underway
+  | 'Implemented'  // Awaiting verification
+  | 'Verified'     // Effectiveness confirmed
+  | 'Closed';      // Complete
+
+export interface ResolutionItem {
+  id: string;
+  linkedCauseIds: string[];     // Many-to-many: links to root cause nodes
+  title: string;
+  description: string;
+  owner: string;
+  targetDate: string;
+  implementedDate: string;
+  verificationMethod: string;
+  verificationResults: string;
+  verifiedDate: string;
+  status: ResolutionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TreeLayoutData {
   x: number;
   y: number;
@@ -58,6 +82,7 @@ export interface SavedTree {
   treeData: CauseNode;
   actions: ActionItem[];
   notes: Note[];
+  resolutions: ResolutionItem[];
 }
 
 export interface AppSettings {

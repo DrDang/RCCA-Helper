@@ -51,6 +51,50 @@ export const REPORT_STATUS_COLORS = {
   }
 };
 
+// Theme-aware resolution status colors (resolved via CSS custom properties)
+export const RESOLUTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  'Draft': {
+    bg: 'var(--color-resolution-draft-bg)',
+    border: 'var(--color-resolution-draft-border)',
+    text: 'var(--color-resolution-draft-text)'
+  },
+  'Approved': {
+    bg: 'var(--color-resolution-approved-bg)',
+    border: 'var(--color-resolution-approved-border)',
+    text: 'var(--color-resolution-approved-text)'
+  },
+  'In Progress': {
+    bg: 'var(--color-resolution-progress-bg)',
+    border: 'var(--color-resolution-progress-border)',
+    text: 'var(--color-resolution-progress-text)'
+  },
+  'Implemented': {
+    bg: 'var(--color-resolution-implemented-bg)',
+    border: 'var(--color-resolution-implemented-border)',
+    text: 'var(--color-resolution-implemented-text)'
+  },
+  'Verified': {
+    bg: 'var(--color-resolution-verified-bg)',
+    border: 'var(--color-resolution-verified-border)',
+    text: 'var(--color-resolution-verified-text)'
+  },
+  'Closed': {
+    bg: 'var(--color-resolution-closed-bg)',
+    border: 'var(--color-resolution-closed-border)',
+    text: 'var(--color-resolution-closed-text)'
+  }
+};
+
+// Hardcoded light-mode colors for resolution statuses in reports
+export const REPORT_RESOLUTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  'Draft': { bg: '#f8fafc', border: '#94a3b8', text: '#475569' },
+  'Approved': { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af' },
+  'In Progress': { bg: '#fefce8', border: '#eab308', text: '#854d0e' },
+  'Implemented': { bg: '#f0fdf4', border: '#22c55e', text: '#166534' },
+  'Verified': { bg: '#ecfdf5', border: '#10b981', text: '#065f46' },
+  'Closed': { bg: '#f5f5f5', border: '#737373', text: '#525252' }
+};
+
 export function createInitialTree(label: string = 'New Issue'): CauseNode {
   return {
     id: crypto.randomUUID(),

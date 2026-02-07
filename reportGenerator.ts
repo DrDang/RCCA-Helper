@@ -1,5 +1,5 @@
-import { SavedTree, CauseNode, NodeStatus } from './types';
-import { REPORT_STATUS_COLORS as STATUS_COLORS } from './constants';
+import { SavedTree, CauseNode, NodeStatus, ResolutionItem } from './types';
+import { REPORT_STATUS_COLORS as STATUS_COLORS, REPORT_RESOLUTION_STATUS_COLORS } from './constants';
 import { flattenTree, getTreeStats, formatDate } from './treeUtils';
 
 const STATUS_LABELS: Record<NodeStatus, string> = {
@@ -115,6 +115,56 @@ function renderActionsTable(tree: SavedTree): string {
   return html;
 }
 
+function renderResolutionsTable(tree: SavedTree): string {
+  const resolutions = tree.resolutions ?? [];
+  if (resolutions.length === 0) {
+    return '<p style="color:#94a3b8;font-style:italic">No resolutions recorded.</p>';
+  }
+
+  const allNodes = flattenTree(tree.treeData);
+  const nodeMap = new Map(allNodes.map(n => [n.id, n]));
+
+  let html = `
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:#f1f5f9;text-align:left">
+          <th style="padding:8px 10px;border:1px solid #e2e8f0">Resolution</th>
+          <th style="padding:8px 10px;border:1px solid #e2e8f0">Linked Root Causes</th>
+          <th style="padding:8px 10px;border:1px solid #e2e8f0">Owner</th>
+          <th style="padding:8px 10px;border:1px solid #e2e8f0">Target Date</th>
+          <th style="padding:8px 10px;border:1px solid #e2e8f0">Status</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  for (let i = 0; i < resolutions.length; i++) {
+    const r = resolutions[i];
+    const linkedCauses = r.linkedCauseIds
+      .map(id => nodeMap.get(id)?.label ?? 'Unknown')
+      .join(', ');
+    const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+    const colors = REPORT_RESOLUTION_STATUS_COLORS[r.status] ?? REPORT_RESOLUTION_STATUS_COLORS['Draft'];
+
+    html += `
+      <tr style="background:${rowBg}">
+        <td style="padding:8px 10px;border:1px solid #e2e8f0">
+          <div><strong>${escapeHtml(r.title)}</strong></div>
+          ${r.description ? `<div style="font-size:11px;color:#64748b;margin-top:2px">${escapeHtml(r.description)}</div>` : ''}
+          ${r.verificationMethod ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px"><em>Verification: ${escapeHtml(r.verificationMethod)}</em></div>` : ''}
+        </td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0">${escapeHtml(linkedCauses) || '—'}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0">${escapeHtml(r.owner || '—')}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0">${r.targetDate || '—'}</td>
+        <td style="padding:8px 10px;border:1px solid #e2e8f0">
+          <span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:12px;font-weight:500;background:${colors.bg};color:${colors.text};border:1px solid ${colors.border}">${escapeHtml(r.status)}</span>
+        </td>
+      </tr>`;
+  }
+
+  html += `</tbody></table>`;
+  return html;
+}
+
 function renderStatGrid(label: string, counts: Record<string, number>, colorMap: Record<string, { bg: string; border: string; text: string }>): string {
   let html = `<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:6px">${escapeHtml(label)}</div><div style="display:flex;gap:8px;flex-wrap:wrap">`;
   for (const [key, count] of Object.entries(counts)) {
@@ -204,6 +254,11 @@ function renderInvestigation(tree: SavedTree, headingTag: 'h1' | 'h2' = 'h1', an
 
   html += `<h3 style="color:#334155;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-top:24px">Action Items (${tree.actions.length})</h3>`;
   html += renderActionsTable(tree);
+
+  // Resolutions section
+  const resolutions = tree.resolutions ?? [];
+  html += `<h3 style="color:#334155;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-top:24px">Resolutions (${resolutions.length})</h3>`;
+  html += renderResolutionsTable(tree);
 
   return html;
 }
