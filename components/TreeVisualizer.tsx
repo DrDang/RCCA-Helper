@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { CauseNode, ActionItem, NodeStatus } from '../types';
 import { CARD_WIDTH, CARD_HEIGHT, STATUS_COLORS } from '../constants';
-import { Plus, Move, ClipboardList } from 'lucide-react';
+import { Plus, Move, ClipboardList, Crosshair } from 'lucide-react';
 
 interface TreeVisualizerProps {
   data: CauseNode;
@@ -22,6 +22,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const [transform, setTransform] = useState({ k: 1, x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
   // Build a set of node IDs that have actions for quick lookup
   const nodesWithActions = useMemo(() => {
@@ -59,6 +60,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         setTransform(event.transform);
       });
 
+    zoomRef.current = zoom;
     d3.select(svgRef.current).call(zoom);
 
     // Center initial view roughly
@@ -70,6 +72,18 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     }
 
   }, []); // Run once on mount
+
+  // Re-center the tree view
+  const handleRecenter = () => {
+    if (!svgRef.current || !containerRef.current || !zoomRef.current) return;
+    const { width } = containerRef.current.getBoundingClientRect();
+    const initialX = width / 2 - (CARD_WIDTH / 2);
+    const initialY = 50;
+    d3.select(svgRef.current)
+      .transition()
+      .duration(300)
+      .call(zoomRef.current.transform, d3.zoomIdentity.translate(initialX, initialY).scale(0.8));
+  };
 
   // Render Logic using curved paths for standard tree look
   const generatePath = (link: d3.HierarchyLink<CauseNode>) => {
@@ -86,8 +100,18 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-hidden relative cursor-move" style={{ backgroundColor: 'var(--color-surface-secondary)' }}>
-      <div className="absolute top-4 left-4 z-10 backdrop-blur p-2 rounded shadow text-xs" style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-tertiary)', opacity: 0.8 }}>
-        <div className="flex items-center gap-2 mb-1"><Move size={14} /> Pan & Zoom Supported</div>
+      <div className="absolute top-4 left-4 z-10 flex gap-2">
+        <div className="backdrop-blur p-2 rounded shadow text-xs" style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-tertiary)', opacity: 0.8 }}>
+          <div className="flex items-center gap-2"><Move size={14} /> Pan & Zoom</div>
+        </div>
+        <button
+          onClick={handleRecenter}
+          className="backdrop-blur p-2 rounded shadow text-xs flex items-center gap-2 hover:opacity-100 transition-opacity"
+          style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)', opacity: 0.8 }}
+          title="Re-center tree view"
+        >
+          <Crosshair size={14} /> Re-center
+        </button>
       </div>
 
       <svg ref={svgRef} className="w-full h-full">

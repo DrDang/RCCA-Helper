@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { ActionItem, CauseNode, Note, NodeStatus, NodeType, ResolutionItem, ResolutionStatus } from '../types';
 import { STATUS_COLORS, RESOLUTION_STATUS_COLORS } from '../constants';
 import {
@@ -14,7 +14,9 @@ import {
     Shield,
     Link2,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    X,
+    GripVertical
 } from 'lucide-react';
 
 const ACTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -64,6 +66,10 @@ interface InspectorPanelProps {
   onAddResolution: (resolution: ResolutionItem) => void;
   onUpdateResolution: (resolution: ResolutionItem) => void;
   onDeleteResolution: (resolutionId: string) => void;
+  isOpen: boolean;
+  onClose: () => void;
+  width: number;
+  onWidthChange: (width: number) => void;
 }
 
 export const InspectorPanel: React.FC<InspectorPanelProps> = ({
@@ -81,14 +87,70 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   onDeleteNote,
   onAddResolution,
   onUpdateResolution,
-  onDeleteResolution
+  onDeleteResolution,
+  isOpen,
+  onClose,
+  width,
+  onWidthChange
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'rail' | 'notes' | 'resolutions'>('details');
   const [expandedResolutionId, setExpandedResolutionId] = useState<string | null>(null);
+  const [isResizing, setIsResizing] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+
+    const startX = e.clientX;
+    const startWidth = width;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = startX - e.clientX;
+      const newWidth = Math.min(800, Math.max(300, startWidth + delta));
+      onWidthChange(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [width, onWidthChange]);
+
+  if (!isOpen) {
+    return null;
+  }
 
   if (!selectedNode) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-8 text-center" style={{ backgroundColor: 'var(--color-surface-primary)', borderLeft: '1px solid var(--color-border-primary)', color: 'var(--color-text-muted)' }}>
+      <div
+        ref={panelRef}
+        className="h-full flex flex-col items-center justify-center p-8 text-center relative"
+        style={{ backgroundColor: 'var(--color-surface-primary)', borderLeft: '1px solid var(--color-border-primary)', color: 'var(--color-text-muted)', width: `${width}px` }}
+      >
+        {/* Resize handle */}
+        <div
+          className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-indigo-400 transition-colors flex items-center justify-center group"
+          onMouseDown={handleMouseDown}
+          style={{ backgroundColor: isResizing ? 'var(--color-indigo-400)' : 'transparent' }}
+        >
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--color-text-muted)' }}>
+            <GripVertical size={12} />
+          </div>
+        </div>
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+          style={{ color: 'var(--color-text-muted)' }}
+          title="Close panel"
+        >
+          <X size={18} />
+        </button>
         <ClipboardList size={48} className="mb-4 opacity-50" />
         <h3 className="font-semibold text-lg" style={{ color: 'var(--color-text-secondary)' }}>No Selection</h3>
         <p className="text-sm">Select a node from the Cause Tree to view details, manage actions (RAIL), or add evidence.</p>
@@ -124,20 +186,52 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col w-[450px] shadow-xl z-20" style={{ backgroundColor: 'var(--color-surface-primary)', borderLeft: '1px solid var(--color-border-primary)' }}>
+    <div
+      ref={panelRef}
+      className="h-full flex flex-col shadow-xl z-20 relative"
+      style={{ backgroundColor: 'var(--color-surface-primary)', borderLeft: '1px solid var(--color-border-primary)', width: `${width}px` }}
+    >
+      {/* Resize handle */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-indigo-400 transition-colors flex items-center justify-center group z-10"
+        onMouseDown={handleMouseDown}
+        style={{ backgroundColor: isResizing ? 'var(--color-indigo-400)' : 'transparent' }}
+      >
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--color-text-muted)' }}>
+          <GripVertical size={12} />
+        </div>
+      </div>
+
       {/* Header */}
       <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid var(--color-border-primary)', backgroundColor: 'var(--color-surface-secondary)' }}>
-        <div>
+        <div className="flex-1 min-w-0 pr-2">
             <span className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'var(--color-text-muted)' }}>{selectedNode.type}</span>
-            <h2 className="font-bold text-lg truncate w-64" style={{ color: 'var(--color-text-primary)' }}>{selectedNode.label}</h2>
+            <input
+                type="text"
+                value={selectedNode.label}
+                onChange={(e) => onUpdateNode({...selectedNode, label: e.target.value})}
+                className="font-bold text-lg w-full bg-transparent outline-none border-b border-transparent hover:border-slate-300 focus:border-indigo-500 transition-colors"
+                style={{ color: 'var(--color-text-primary)' }}
+                placeholder="Node name..."
+            />
         </div>
-        <button
-            onClick={() => onDeleteNode(selectedNode.id)}
-            className="text-red-400 hover:text-red-600 p-2 rounded hover:bg-red-50"
-            title="Delete Node"
-        >
-            <Trash2 size={16} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+              onClick={() => onDeleteNode(selectedNode.id)}
+              className="text-red-400 hover:text-red-600 p-2 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+              title="Delete Node"
+          >
+              <Trash2 size={16} />
+          </button>
+          <button
+              onClick={onClose}
+              className="p-2 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              style={{ color: 'var(--color-text-muted)' }}
+              title="Close panel"
+          >
+              <X size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -240,17 +334,6 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             </div>
 
             <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase" style={{ color: 'var(--color-text-tertiary)' }}>Node Label</label>
-                <input
-                    type="text"
-                    value={selectedNode.label}
-                    onChange={(e) => onUpdateNode({...selectedNode, label: e.target.value})}
-                    className="w-full p-2 text-sm rounded"
-                    style={{ backgroundColor: 'var(--color-surface-primary)', borderColor: 'var(--color-border-secondary)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border-secondary)' }}
-                />
-            </div>
-
-            <div className="space-y-2">
                 <label className="text-xs font-semibold uppercase" style={{ color: 'var(--color-text-tertiary)' }}>Rationale</label>
                 <textarea
                     className="w-full p-2 text-sm rounded focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -272,7 +355,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             const activeActions = sorted.filter(a => a.status !== 'Complete' && a.status !== 'Closed');
             const closedActions = sorted.filter(a => a.status === 'Complete' || a.status === 'Closed');
 
-            const renderActionCard = (action: ActionItem) => {
+            const renderActionCard = (action: ActionItem, displayIndex: number) => {
                 const colors = ACTION_STATUS_COLORS[action.status] ?? ACTION_STATUS_COLORS['Open'];
                 return (
                     <div
@@ -280,16 +363,29 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         className="p-3 rounded border shadow-sm text-sm relative"
                         style={{ backgroundColor: colors.bg, borderColor: colors.border }}
                     >
-                        <button
-                            onClick={() => onDeleteAction(action.id)}
-                            className="absolute top-2 right-2 hover:text-red-400"
-                            style={{ color: 'var(--color-text-muted)' }}
-                            title="Delete Action"
-                        >
-                            <XCircle size={14} />
-                        </button>
+                        <div className="absolute top-2 right-2 flex items-center gap-2">
+                            <span
+                                className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-muted)' }}
+                                title={`Task ID: ${displayIndex}`}
+                            >
+                                #{displayIndex}
+                            </span>
+                            <button
+                                onClick={() => {
+                                    if (window.confirm(`Delete action "${action.action}"? This cannot be undone.`)) {
+                                        onDeleteAction(action.id);
+                                    }
+                                }}
+                                className="hover:text-red-400"
+                                style={{ color: 'var(--color-text-muted)' }}
+                                title="Delete Action"
+                            >
+                                <XCircle size={14} />
+                            </button>
+                        </div>
                         <input
-                            className="font-semibold w-full mb-2 bg-transparent outline-none pr-6"
+                            className="font-semibold w-full mb-2 bg-transparent outline-none pr-16"
                             style={{ color: colors.text }}
                             value={action.action}
                             onChange={(e) => onUpdateAction({...action, action: e.target.value})}
@@ -364,7 +460,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
                     {activeActions.length > 0 && (
                         <div className="space-y-3">
-                            {activeActions.map(renderActionCard)}
+                            {activeActions.map(action => {
+                                const displayIndex = nodeActions.indexOf(action) + 1;
+                                return renderActionCard(action, displayIndex);
+                            })}
                         </div>
                     )}
 
@@ -378,7 +477,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
                     {closedActions.length > 0 && (
                         <div className="space-y-3">
-                            {closedActions.map(renderActionCard)}
+                            {closedActions.map(action => {
+                                const displayIndex = nodeActions.indexOf(action) + 1;
+                                return renderActionCard(action, displayIndex);
+                            })}
                         </div>
                     )}
                 </div>

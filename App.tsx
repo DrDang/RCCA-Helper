@@ -9,7 +9,7 @@ import { createInitialTree } from './constants';
 import { loadAppState, saveAppState, exportTreeAsJson, exportAllTreesAsJson, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS } from './persistence';
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
 import { SettingsModal } from './components/SettingsModal';
-import { GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun, Shield } from 'lucide-react';
+import { GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun, Shield, PanelRightOpen } from 'lucide-react';
 
 const App: React.FC = () => {
   const [trees, setTrees] = useState<SavedTree[]>([]);
@@ -21,6 +21,8 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [lastExportTimestamp, setLastExportTs] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorWidth, setInspectorWidth] = useState(450);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -562,7 +564,24 @@ const App: React.FC = () => {
               onAddResolution={handleAddResolution}
               onUpdateResolution={handleUpdateResolution}
               onDeleteResolution={handleDeleteResolution}
+              isOpen={inspectorOpen}
+              onClose={() => setInspectorOpen(false)}
+              width={inspectorWidth}
+              onWidthChange={setInspectorWidth}
           />
+
+          {/* Floating button to reopen inspector when closed */}
+          {!inspectorOpen && (
+            <button
+              onClick={() => setInspectorOpen(true)}
+              className="absolute right-4 top-4 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all z-30 flex items-center gap-2"
+              style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-primary)' }}
+              title="Open inspector panel"
+            >
+              <PanelRightOpen size={20} />
+              <span className="text-sm font-medium">Inspector</span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center" style={{ color: 'var(--color-text-muted)' }}>
