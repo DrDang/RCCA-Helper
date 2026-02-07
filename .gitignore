@@ -141,3 +141,4 @@ vite.config.ts.timestamp-*
 # Project-specific
 .DS_Store
 mission.md
+Portable_Dist/
