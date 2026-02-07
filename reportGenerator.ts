@@ -98,11 +98,19 @@ function renderActionsTable(tree: SavedTree): string {
     const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
     const statusColor = actionStatusColors[a.status] ?? '#64748b';
 
+    const updates = a.updates ?? [];
+    const updatesHtml = updates.length > 0
+      ? `<div style="margin-top:4px;padding-top:4px;border-top:1px solid #e2e8f0">${updates.map(u =>
+          `<div style="font-size:11px;color:#64748b;margin-top:2px"><span style="color:#94a3b8">${new Date(u.createdAt).toLocaleDateString()}</span> — ${escapeHtml(u.content)}</div>`
+        ).join('')}</div>`
+      : '';
+
     html += `
       <tr style="background:${rowBg}">
         <td style="padding:8px 10px;border:1px solid #e2e8f0">
           <div>${escapeHtml(a.action)}</div>
           ${a.rationale ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px">${escapeHtml(a.rationale)}</div>` : ''}
+          ${updatesHtml}
         </td>
         <td style="padding:8px 10px;border:1px solid #e2e8f0">${causeNode ? escapeHtml(causeNode.label) : '—'}</td>
         <td style="padding:8px 10px;border:1px solid #e2e8f0">${escapeHtml(a.assignee || '—')}</td>

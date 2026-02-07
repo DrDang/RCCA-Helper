@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CauseNode, ResolutionItem, ResolutionStatus } from '../types';
+import { ActionUpdate, CauseNode, ResolutionItem, ResolutionStatus } from '../types';
 import { RESOLUTION_STATUS_COLORS } from '../constants';
 import {
     Shield,
@@ -13,7 +13,9 @@ import {
     Filter,
     AlertTriangle,
     FileText,
-    ExternalLink
+    ExternalLink,
+    MessageSquarePlus,
+    ChevronRight
 } from 'lucide-react';
 
 const RESOLUTION_STATUSES: ResolutionStatus[] = [
@@ -52,6 +54,8 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
 }) => {
   const [statusFilter, setStatusFilter] = useState<ResolutionStatus | 'all'>('all');
   const [expandedResolutionId, setExpandedResolutionId] = useState<string | null>(null);
+  const [expandedResolutionUpdates, setExpandedResolutionUpdates] = useState<Record<string, boolean>>({});
+  const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
 
   // Filter and sort resolutions
   const filteredResolutions = resolutions
@@ -286,6 +290,87 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Updates / Activity Log */}
+            <div className="pt-3" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
+              <button
+                onClick={() => setExpandedResolutionUpdates(prev => ({ ...prev, [resolution.id]: !prev[resolution.id] }))}
+                className="flex items-center gap-1 text-xs uppercase tracking-wider font-semibold w-full"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                <ChevronRight
+                  size={14}
+                  className={`transition-transform ${expandedResolutionUpdates[resolution.id] ? 'rotate-90' : ''}`}
+                />
+                Updates ({(resolution.updates ?? []).length})
+              </button>
+
+              {expandedResolutionUpdates[resolution.id] && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Add update..."
+                      className="flex-1 text-sm p-2 rounded"
+                      style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-secondary)', color: 'var(--color-text-primary)' }}
+                      value={newUpdateText[resolution.id] ?? ''}
+                      onChange={(e) => setNewUpdateText(prev => ({ ...prev, [resolution.id]: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (newUpdateText[resolution.id] ?? '').trim()) {
+                          const update: ActionUpdate = {
+                            id: crypto.randomUUID(),
+                            content: (newUpdateText[resolution.id] ?? '').trim(),
+                            createdAt: new Date().toISOString(),
+                          };
+                          onUpdateResolution({ ...resolution, updates: [...(resolution.updates ?? []), update] });
+                          setNewUpdateText(prev => ({ ...prev, [resolution.id]: '' }));
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        if (!(newUpdateText[resolution.id] ?? '').trim()) return;
+                        const update: ActionUpdate = {
+                          id: crypto.randomUUID(),
+                          content: (newUpdateText[resolution.id] ?? '').trim(),
+                          createdAt: new Date().toISOString(),
+                        };
+                        onUpdateResolution({ ...resolution, updates: [...(resolution.updates ?? []), update] });
+                        setNewUpdateText(prev => ({ ...prev, [resolution.id]: '' }));
+                      }}
+                      className="px-3 py-2 rounded text-sm"
+                      style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-secondary)', color: 'var(--color-text-secondary)' }}
+                      title="Add update"
+                    >
+                      <MessageSquarePlus size={16} />
+                    </button>
+                  </div>
+                  {(resolution.updates ?? []).length === 0 && (
+                    <p className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>No updates yet.</p>
+                  )}
+                  {[...(resolution.updates ?? [])].reverse().map(update => (
+                    <div key={update.id} className="text-sm p-3 rounded" style={{ backgroundColor: 'var(--color-surface-primary)' }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                          {new Date(update.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <button
+                          onClick={() => {
+                            onUpdateResolution({ ...resolution, updates: (resolution.updates ?? []).filter(u => u.id !== update.id) });
+                          }}
+                          className="hover:text-red-400"
+                          style={{ color: 'var(--color-text-muted)' }}
+                          title="Delete update"
+                        >
+                          <XCircle size={12} />
+                        </button>
+                      </div>
+                      <p style={{ color: 'var(--color-text-secondary)' }}>{update.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

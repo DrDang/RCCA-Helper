@@ -23,6 +23,12 @@ export interface CauseNode {
   children?: CauseNode[];
 }
 
+export interface ActionUpdate {
+  id: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface ActionItem {
   id: string;
   causeId: string;
@@ -32,6 +38,7 @@ export interface ActionItem {
   assignedDate: string;
   dueDate: string;
   status: 'Open' | 'In Progress' | 'Complete' | 'Blocked' | 'Closed';
+  updates?: ActionUpdate[];
 }
 
 export interface Note {
@@ -65,6 +72,7 @@ export interface ResolutionItem {
   status: ResolutionStatus;
   createdAt: string;
   updatedAt: string;
+  updates?: ActionUpdate[];
 }
 
 export interface TreeLayoutData {

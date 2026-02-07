@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { ActionItem, CauseNode, Note, NodeStatus, NodeType, ResolutionItem, ResolutionStatus } from '../types';
+import { ActionItem, ActionUpdate, CauseNode, Note, NodeStatus, NodeType, ResolutionItem, ResolutionStatus } from '../types';
 import { STATUS_COLORS, RESOLUTION_STATUS_COLORS } from '../constants';
 import {
     ClipboardList,
@@ -16,7 +16,9 @@ import {
     ChevronDown,
     ChevronUp,
     X,
-    GripVertical
+    GripVertical,
+    MessageSquarePlus,
+    ChevronRight
 } from 'lucide-react';
 
 const ACTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -95,6 +97,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'rail' | 'notes' | 'resolutions'>('details');
   const [expandedResolutionId, setExpandedResolutionId] = useState<string | null>(null);
+  const [expandedActionUpdates, setExpandedActionUpdates] = useState<Record<string, boolean>>({});
+  const [expandedResolutionUpdates, setExpandedResolutionUpdates] = useState<Record<string, boolean>>({});
+  const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
   const [isResizing, setIsResizing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -433,6 +438,90 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                             <option>Blocked</option>
                             <option>Closed</option>
                         </select>
+
+                        {/* Updates / Activity Log */}
+                        <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
+                            <button
+                                onClick={() => setExpandedActionUpdates(prev => ({ ...prev, [action.id]: !prev[action.id] }))}
+                                className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold w-full"
+                                style={{ color: 'var(--color-text-muted)' }}
+                            >
+                                <ChevronRight
+                                    size={12}
+                                    className={`transition-transform ${expandedActionUpdates[action.id] ? 'rotate-90' : ''}`}
+                                />
+                                Updates ({(action.updates ?? []).length})
+                            </button>
+
+                            {expandedActionUpdates[action.id] && (
+                                <div className="mt-2 space-y-2">
+                                    {/* Add new update */}
+                                    <div className="flex gap-1">
+                                        <input
+                                            type="text"
+                                            placeholder="Add update..."
+                                            className="flex-1 text-xs p-1.5 rounded"
+                                            style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-secondary)', color: 'var(--color-text-primary)' }}
+                                            value={newUpdateText[action.id] ?? ''}
+                                            onChange={(e) => setNewUpdateText(prev => ({ ...prev, [action.id]: e.target.value }))}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && (newUpdateText[action.id] ?? '').trim()) {
+                                                    const update: ActionUpdate = {
+                                                        id: crypto.randomUUID(),
+                                                        content: (newUpdateText[action.id] ?? '').trim(),
+                                                        createdAt: new Date().toISOString(),
+                                                    };
+                                                    onUpdateAction({ ...action, updates: [...(action.updates ?? []), update] });
+                                                    setNewUpdateText(prev => ({ ...prev, [action.id]: '' }));
+                                                }
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                if (!(newUpdateText[action.id] ?? '').trim()) return;
+                                                const update: ActionUpdate = {
+                                                    id: crypto.randomUUID(),
+                                                    content: (newUpdateText[action.id] ?? '').trim(),
+                                                    createdAt: new Date().toISOString(),
+                                                };
+                                                onUpdateAction({ ...action, updates: [...(action.updates ?? []), update] });
+                                                setNewUpdateText(prev => ({ ...prev, [action.id]: '' }));
+                                            }}
+                                            className="px-2 py-1 rounded text-xs"
+                                            style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-secondary)', color: 'var(--color-text-secondary)' }}
+                                            title="Add update"
+                                        >
+                                            <MessageSquarePlus size={13} />
+                                        </button>
+                                    </div>
+
+                                    {/* Update list (newest first) */}
+                                    {(action.updates ?? []).length === 0 && (
+                                        <p className="text-[10px] italic" style={{ color: 'var(--color-text-muted)' }}>No updates yet.</p>
+                                    )}
+                                    {[...(action.updates ?? [])].reverse().map(update => (
+                                        <div key={update.id} className="text-xs p-2 rounded" style={{ backgroundColor: 'var(--color-surface-primary)' }}>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                                                    {new Date(update.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                                <button
+                                                    onClick={() => {
+                                                        onUpdateAction({ ...action, updates: (action.updates ?? []).filter(u => u.id !== update.id) });
+                                                    }}
+                                                    className="hover:text-red-400"
+                                                    style={{ color: 'var(--color-text-muted)' }}
+                                                    title="Delete update"
+                                                >
+                                                    <XCircle size={10} />
+                                                </button>
+                                            </div>
+                                            <p style={{ color: 'var(--color-text-secondary)' }}>{update.content}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 );
             };
@@ -774,6 +863,87 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Updates / Activity Log */}
+                                <div className="pt-2" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
+                                    <button
+                                        onClick={() => setExpandedResolutionUpdates(prev => ({ ...prev, [resolution.id]: !prev[resolution.id] }))}
+                                        className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold w-full"
+                                        style={{ color: 'var(--color-text-muted)' }}
+                                    >
+                                        <ChevronRight
+                                            size={12}
+                                            className={`transition-transform ${expandedResolutionUpdates[resolution.id] ? 'rotate-90' : ''}`}
+                                        />
+                                        Updates ({(resolution.updates ?? []).length})
+                                    </button>
+
+                                    {expandedResolutionUpdates[resolution.id] && (
+                                        <div className="mt-2 space-y-2">
+                                            <div className="flex gap-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Add update..."
+                                                    className="flex-1 text-xs p-1.5 rounded"
+                                                    style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-secondary)', color: 'var(--color-text-primary)' }}
+                                                    value={newUpdateText[resolution.id] ?? ''}
+                                                    onChange={(e) => setNewUpdateText(prev => ({ ...prev, [resolution.id]: e.target.value }))}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && (newUpdateText[resolution.id] ?? '').trim()) {
+                                                            const update: ActionUpdate = {
+                                                                id: crypto.randomUUID(),
+                                                                content: (newUpdateText[resolution.id] ?? '').trim(),
+                                                                createdAt: new Date().toISOString(),
+                                                            };
+                                                            onUpdateResolution({ ...resolution, updates: [...(resolution.updates ?? []), update] });
+                                                            setNewUpdateText(prev => ({ ...prev, [resolution.id]: '' }));
+                                                        }
+                                                    }}
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        if (!(newUpdateText[resolution.id] ?? '').trim()) return;
+                                                        const update: ActionUpdate = {
+                                                            id: crypto.randomUUID(),
+                                                            content: (newUpdateText[resolution.id] ?? '').trim(),
+                                                            createdAt: new Date().toISOString(),
+                                                        };
+                                                        onUpdateResolution({ ...resolution, updates: [...(resolution.updates ?? []), update] });
+                                                        setNewUpdateText(prev => ({ ...prev, [resolution.id]: '' }));
+                                                    }}
+                                                    className="px-2 py-1 rounded text-xs"
+                                                    style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-secondary)', color: 'var(--color-text-secondary)' }}
+                                                    title="Add update"
+                                                >
+                                                    <MessageSquarePlus size={13} />
+                                                </button>
+                                            </div>
+                                            {(resolution.updates ?? []).length === 0 && (
+                                                <p className="text-[10px] italic" style={{ color: 'var(--color-text-muted)' }}>No updates yet.</p>
+                                            )}
+                                            {[...(resolution.updates ?? [])].reverse().map(update => (
+                                                <div key={update.id} className="text-xs p-2 rounded" style={{ backgroundColor: 'var(--color-surface-primary)' }}>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                                                            {new Date(update.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => {
+                                                                onUpdateResolution({ ...resolution, updates: (resolution.updates ?? []).filter(u => u.id !== update.id) });
+                                                            }}
+                                                            className="hover:text-red-400"
+                                                            style={{ color: 'var(--color-text-muted)' }}
+                                                            title="Delete update"
+                                                        >
+                                                            <XCircle size={10} />
+                                                        </button>
+                                                    </div>
+                                                    <p style={{ color: 'var(--color-text-secondary)' }}>{update.content}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>

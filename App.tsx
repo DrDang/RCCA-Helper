@@ -4,25 +4,28 @@ import { InspectorPanel } from './components/InspectorPanel';
 import { TreeManager } from './components/TreeManager';
 import { DashboardView } from './components/DashboardView';
 import { ResolutionsSummary } from './components/ResolutionsSummary';
+import { InvestigationActionsSummary } from './components/InvestigationActionsSummary';
 import { CauseNode, ActionItem, Note, NodeStatus, NodeType, SavedTree, AppSettings, ResolutionItem } from './types';
 import { createInitialTree } from './constants';
-import { loadAppState, saveAppState, exportTreeAsJson, exportAllTreesAsJson, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS } from './persistence';
+import { loadAppState, saveAppState, exportTreeAsJson, exportAllTreesAsJson, parseImportFile, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS } from './persistence';
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
 import { SettingsModal } from './components/SettingsModal';
-import { GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun, Shield, PanelRightOpen } from 'lucide-react';
+import { ImportDialog } from './components/ImportDialog';
+import { GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun, Shield, ClipboardList, PanelRightOpen } from 'lucide-react';
 
 const App: React.FC = () => {
   const [trees, setTrees] = useState<SavedTree[]>([]);
   const [activeTreeId, setActiveTreeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
-  const [currentView, setCurrentView] = useState<'tree' | 'dashboard' | 'resolutions'>('tree');
+  const [currentView, setCurrentView] = useState<'tree' | 'dashboard' | 'investigate' | 'resolutions'>('tree');
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
   const [lastExportTimestamp, setLastExportTs] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [inspectorWidth, setInspectorWidth] = useState(450);
+  const [importCandidates, setImportCandidates] = useState<SavedTree[] | null>(null);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -121,9 +124,8 @@ const App: React.FC = () => {
     }
     return result;
   };
-  const allRootCauses = treeData
-    ? flattenTree(treeData).filter(n => n.isRootCause === true)
-    : [];
+  const allNodes = treeData ? flattenTree(treeData) : [];
+  const allRootCauses = allNodes.filter(n => n.isRootCause === true);
 
   // Helper to update the active tree within the trees array
   const updateActiveTree = useCallback((updater: (tree: SavedTree) => SavedTree) => {
@@ -338,11 +340,50 @@ const App: React.FC = () => {
     ));
   };
 
-  const handleImportTree = (imported: SavedTree) => {
-    const newTree = { ...imported, id: crypto.randomUUID() };
-    setTrees(prev => [...prev, newTree]);
-    setActiveTreeId(newTree.id);
+  const handleFileSelected = async (file: File) => {
+    try {
+      const parsed = await parseImportFile(file);
+      setImportCandidates(parsed);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to import file');
+    }
+  };
+
+  const handleImportConfirm = (selected: SavedTree[], conflictMode: 'append' | 'overwrite') => {
+    let firstResultId: string | null = null;
+
+    setTrees(prev => {
+      const updatedTrees = [...prev];
+
+      for (const importedTree of selected) {
+        const normalizedName = importedTree.name.trim().toLowerCase();
+        const existingIndex = updatedTrees.findIndex(
+          t => t.name.trim().toLowerCase() === normalizedName
+        );
+
+        if (existingIndex !== -1 && conflictMode === 'overwrite') {
+          const existingId = updatedTrees[existingIndex].id;
+          updatedTrees[existingIndex] = {
+            ...importedTree,
+            id: existingId,
+            updatedAt: new Date().toISOString(),
+          };
+          if (!firstResultId) firstResultId = existingId;
+        } else {
+          const newId = crypto.randomUUID();
+          updatedTrees.push({ ...importedTree, id: newId });
+          if (!firstResultId) firstResultId = newId;
+        }
+      }
+
+      return updatedTrees;
+    });
+
+    if (firstResultId) {
+      setActiveTreeId(firstResultId);
+    }
     setSelectedNodeId(null);
+    setImportCandidates(null);
   };
 
   const handleExportTree = (id: string) => {
@@ -374,13 +415,6 @@ const App: React.FC = () => {
     setLastExportTimestamp();
     setLastExportTs(new Date().toISOString());
     setHasUnsavedChanges(false);
-  };
-
-  const handleImportAll = (imported: SavedTree[]) => {
-    const newTrees = imported.map(t => ({ ...t, id: crypto.randomUUID() }));
-    setTrees(prev => [...prev, ...newTrees]);
-    setActiveTreeId(newTrees[0].id);
-    setSelectedNodeId(null);
   };
 
   const handleGenerateReport = (id: string) => {
@@ -438,6 +472,14 @@ const App: React.FC = () => {
               <LayoutDashboard size={14} /> Dashboard
             </button>
             <button
+              onClick={() => setCurrentView('investigate')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${currentView === 'investigate' ? 'bg-indigo-600 text-white' : ''}`}
+              style={currentView !== 'investigate' ? { backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)', borderLeft: '1px solid var(--color-border-primary)' } : { borderLeft: '1px solid var(--color-border-primary)' }}
+              title="View all investigation actions for current investigation"
+            >
+              <ClipboardList size={14} /> Investigate
+            </button>
+            <button
               onClick={() => setCurrentView('resolutions')}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${currentView === 'resolutions' ? 'bg-indigo-600 text-white' : ''}`}
               style={currentView !== 'resolutions' ? { backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)', borderLeft: '1px solid var(--color-border-primary)' } : { borderLeft: '1px solid var(--color-border-primary)' }}
@@ -468,10 +510,9 @@ const App: React.FC = () => {
             onCreateTree={handleCreateTree}
             onDeleteTree={handleDeleteTree}
             onRenameTree={handleRenameTree}
-            onImportTree={handleImportTree}
+            onFileSelected={handleFileSelected}
             onExportTree={handleExportTree}
             onExportAll={handleExportAll}
-            onImportAll={handleImportAll}
             onGenerateReport={handleGenerateReport}
             onGenerateBulkReport={handleGenerateBulkReport}
           />
@@ -517,6 +558,23 @@ const App: React.FC = () => {
           onGenerateReport={handleGenerateReport}
           onGenerateBulkReport={handleGenerateBulkReport}
         />
+      ) : currentView === 'investigate' ? (
+        activeTree ? (
+          <InvestigationActionsSummary
+            actions={actions}
+            allNodes={allNodes}
+            treeName={activeTree.name}
+            onAddAction={handleAddAction}
+            onUpdateAction={handleUpdateAction}
+            onDeleteAction={handleDeleteAction}
+            onNavigateToNode={handleNavigateToNode}
+            onGenerateReport={() => handleGenerateReport(activeTree.id)}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center" style={{ color: 'var(--color-text-muted)' }}>
+            <p>No investigation selected. Create or import one using the dropdown above.</p>
+          </div>
+        )
       ) : currentView === 'resolutions' ? (
         activeTree ? (
           <ResolutionsSummary
@@ -598,6 +656,15 @@ const App: React.FC = () => {
           onUpdateSettings={handleUpdateSettings}
           onClose={() => setShowSettings(false)}
           onBackupNow={handleBackupNow}
+        />
+      )}
+
+      {importCandidates && (
+        <ImportDialog
+          importCandidates={importCandidates}
+          existingTrees={trees}
+          onConfirm={handleImportConfirm}
+          onClose={() => setImportCandidates(null)}
         />
       )}
     </div>

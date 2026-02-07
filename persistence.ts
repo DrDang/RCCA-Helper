@@ -107,6 +107,39 @@ export function exportTreeAsJson(tree: SavedTree): void {
   URL.revokeObjectURL(url);
 }
 
+export function parseImportFile(file: File): Promise<SavedTree[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result as string);
+        const candidates: unknown[] = Array.isArray(data) ? data : [data];
+
+        if (candidates.length === 0) {
+          reject(new Error('File contains no investigations'));
+          return;
+        }
+
+        const validated: SavedTree[] = [];
+        for (const item of candidates) {
+          const tree = item as SavedTree;
+          if (!tree.treeData || !tree.id || !tree.name) {
+            reject(new Error(`Invalid investigation in file: "${(item as { name?: string }).name || 'unknown'}"`));
+            return;
+          }
+          validated.push(migrateTree(tree));
+        }
+
+        resolve(validated);
+      } catch {
+        reject(new Error('Failed to parse JSON file'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsText(file);
+  });
+}
+
 export function importTreeFromJson(file: File): Promise<SavedTree> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

@@ -1,8 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { SavedTree, NodeStatus } from '../types';
 import { STATUS_COLORS } from '../constants';
-import { importTreeFromJson, importAllTreesFromJson } from '../persistence';
-import { ChevronDown, Plus, Upload, Download, Trash2, Pencil, Check, X, PackageOpen, Package, FileText, FileStack } from 'lucide-react';
+import { ChevronDown, Plus, Upload, Download, Trash2, Pencil, Check, X, Package, FileText, FileStack } from 'lucide-react';
 
 interface TreeManagerProps {
   trees: SavedTree[];
@@ -11,10 +10,9 @@ interface TreeManagerProps {
   onCreateTree: () => void;
   onDeleteTree: (id: string) => void;
   onRenameTree: (id: string, newName: string) => void;
-  onImportTree: (tree: SavedTree) => void;
+  onFileSelected: (file: File) => void;
   onExportTree: (id: string) => void;
   onExportAll: () => void;
-  onImportAll: (trees: SavedTree[]) => void;
   onGenerateReport: (id: string) => void;
   onGenerateBulkReport: () => void;
 }
@@ -26,10 +24,9 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
   onCreateTree,
   onDeleteTree,
   onRenameTree,
-  onImportTree,
+  onFileSelected,
   onExportTree,
   onExportAll,
-  onImportAll,
   onGenerateReport,
   onGenerateBulkReport,
 }) => {
@@ -37,7 +34,6 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const bulkImportRef = useRef<HTMLInputElement>(null);
 
   const activeTree = trees.find(t => t.id === activeTreeId);
 
@@ -59,28 +55,10 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
     setRenameValue('');
   };
 
-  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      const trees = await importAllTreesFromJson(file);
-      onImportAll(trees);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to import file');
-    }
-    e.target.value = '';
-  };
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const tree = await importTreeFromJson(file);
-      onImportTree(tree);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to import file');
-    }
-    // Reset input so the same file can be re-imported
+    onFileSelected(file);
     e.target.value = '';
   };
 
@@ -257,18 +235,6 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
                 Export All
               </button>
               <button
-                onClick={() => bulkImportRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-                style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
-              >
-                <PackageOpen size={15} />
-                Import All
-              </button>
-            </div>
-
-            {/* Report actions */}
-            <div className="px-3 py-2.5 flex gap-2" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
-              <button
                 onClick={() => { onGenerateBulkReport(); }}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
               >
@@ -282,14 +248,7 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
               type="file"
               accept=".json"
               className="hidden"
-              onChange={handleImport}
-            />
-            <input
-              ref={bulkImportRef}
-              type="file"
-              accept=".json"
-              className="hidden"
-              onChange={handleBulkImport}
+              onChange={handleFileChange}
             />
           </div>
         </>

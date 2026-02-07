@@ -1,6 +1,6 @@
 import React from 'react';
 import { SavedTree, NodeStatus } from '../types';
-import { STATUS_COLORS } from '../constants';
+import { STATUS_COLORS, RESOLUTION_STATUS_COLORS } from '../constants';
 import { getTreeStats, formatDate } from '../treeUtils';
 import { FileText, FileStack } from 'lucide-react';
 
@@ -63,6 +63,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           'Complete': 'var(--color-action-complete-border)',
           'Blocked': 'var(--color-action-blocked-border)',
           'Closed': 'var(--color-action-closed-border)',
+        };
+
+        const RESOLUTION_COLOR_MAP: Record<string, string> = {
+          'Draft': 'var(--color-resolution-draft-text)',
+          'Approved': 'var(--color-resolution-approved-text)',
+          'In Progress': 'var(--color-resolution-progress-text)',
+          'Implemented': 'var(--color-resolution-implemented-text)',
+          'Verified': 'var(--color-resolution-verified-text)',
+          'Closed': 'var(--color-resolution-closed-text)',
+        };
+
+        const RESOLUTION_BORDER_MAP: Record<string, string> = {
+          'Draft': 'var(--color-resolution-draft-border)',
+          'Approved': 'var(--color-resolution-approved-border)',
+          'In Progress': 'var(--color-resolution-progress-border)',
+          'Implemented': 'var(--color-resolution-implemented-border)',
+          'Verified': 'var(--color-resolution-verified-border)',
+          'Closed': 'var(--color-resolution-closed-border)',
         };
 
         // Determine if an investigation is "active" (has work in progress)
@@ -139,7 +157,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
               {stats.totalActions > 0 && (
                 <div className="px-4 pb-3">
-                  <div className="text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Actions</div>
+                  <div className="text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Investigate</div>
                   <div className="flex flex-wrap gap-1.5">
                     {Object.entries(stats.actionsByStatus).map(([status, count]) => {
                       if (count === 0) return null;
@@ -161,9 +179,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
               )}
 
+              {stats.totalResolutions > 0 && (
+                <div className="px-4 pb-3">
+                  <div className="text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Corrective</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(stats.resolutionsByStatus).map(([status, count]) => {
+                      if (count === 0) return null;
+                      return (
+                        <span
+                          key={`res-${status}`}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                          style={{
+                            backgroundColor: 'var(--color-surface-tertiary)',
+                            color: RESOLUTION_COLOR_MAP[status] ?? 'var(--color-text-secondary)',
+                            border: `1px solid ${RESOLUTION_BORDER_MAP[status] ?? 'var(--color-border-secondary)'}`,
+                          }}
+                        >
+                          {count} {status}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="mt-auto px-4 py-2.5 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
                 <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  {stats.totalNodes} node{stats.totalNodes !== 1 ? 's' : ''} · {stats.totalActions} action{stats.totalActions !== 1 ? 's' : ''}
+                  {stats.totalNodes} node{stats.totalNodes !== 1 ? 's' : ''} · {stats.totalActions} action{stats.totalActions !== 1 ? 's' : ''}{stats.totalResolutions > 0 ? ` · ${stats.totalResolutions} corrective` : ''}
                 </span>
                 <button
                   onClick={e => { e.stopPropagation(); onGenerateReport(tree.id); }}
