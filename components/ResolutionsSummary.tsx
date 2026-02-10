@@ -55,6 +55,7 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
   const [statusFilter, setStatusFilter] = useState<ResolutionStatus | 'all'>('all');
   const [expandedResolutionId, setExpandedResolutionId] = useState<string | null>(null);
   const [expandedResolutionUpdates, setExpandedResolutionUpdates] = useState<Record<string, boolean>>({});
+  const [expandedRootCauseLinks, setExpandedRootCauseLinks] = useState<Record<string, boolean>>({});
   const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
 
   // Filter and sort resolutions
@@ -265,29 +266,58 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
 
             {/* Link to root causes */}
             {allRootCauses.length > 0 && (
-              <div>
-                <label className="text-xs uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Link to Root Causes</label>
-                <div className="mt-2 space-y-1">
-                  {allRootCauses.map(rc => (
-                    <label key={rc.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={resolution.linkedCauseIds.includes(rc.id)}
-                        onChange={(e) => {
-                          const newLinked = e.target.checked
-                            ? [...resolution.linkedCauseIds, rc.id]
-                            : resolution.linkedCauseIds.filter(id => id !== rc.id);
-                          if (newLinked.length > 0) {
-                            onUpdateResolution({...resolution, linkedCauseIds: newLinked});
-                          }
-                        }}
-                        className="rounded"
-                        disabled={resolution.linkedCauseIds.length === 1 && resolution.linkedCauseIds[0] === rc.id}
-                      />
-                      <span style={{ color: 'var(--color-text-secondary)' }}>{rc.label}</span>
-                    </label>
-                  ))}
-                </div>
+              <div className="pt-3" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
+                <button
+                  onClick={() => setExpandedRootCauseLinks(prev => ({ ...prev, [resolution.id]: !prev[resolution.id] }))}
+                  className="flex items-center gap-1 text-xs uppercase tracking-wider font-semibold w-full"
+                  style={{ color: 'var(--color-text-muted)' }}
+                >
+                  <ChevronRight
+                    size={14}
+                    className={`transition-transform ${expandedRootCauseLinks[resolution.id] ? 'rotate-90' : ''}`}
+                  />
+                  Link to Root Causes ({resolution.linkedCauseIds.length} linked)
+                </button>
+
+                {/* Always show linked causes as summary */}
+                {!expandedRootCauseLinks[resolution.id] && resolution.linkedCauseIds.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {resolution.linkedCauseIds.map(id => (
+                      <span
+                        key={id}
+                        className="text-xs px-2 py-0.5 rounded"
+                        style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
+                      >
+                        {getRootCauseLabel(id)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Expanded: show all checkboxes */}
+                {expandedRootCauseLinks[resolution.id] && (
+                  <div className="mt-3 space-y-1">
+                    {allRootCauses.map(rc => (
+                      <label key={rc.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={resolution.linkedCauseIds.includes(rc.id)}
+                          onChange={(e) => {
+                            const newLinked = e.target.checked
+                              ? [...resolution.linkedCauseIds, rc.id]
+                              : resolution.linkedCauseIds.filter(id => id !== rc.id);
+                            if (newLinked.length > 0) {
+                              onUpdateResolution({...resolution, linkedCauseIds: newLinked});
+                            }
+                          }}
+                          className="rounded"
+                          disabled={resolution.linkedCauseIds.length === 1 && resolution.linkedCauseIds[0] === rc.id}
+                        />
+                        <span style={{ color: 'var(--color-text-secondary)' }}>{rc.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -356,7 +386,9 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
                         </span>
                         <button
                           onClick={() => {
-                            onUpdateResolution({ ...resolution, updates: (resolution.updates ?? []).filter(u => u.id !== update.id) });
+                            if (window.confirm('Delete this update? This cannot be undone.')) {
+                              onUpdateResolution({ ...resolution, updates: (resolution.updates ?? []).filter(u => u.id !== update.id) });
+                            }
                           }}
                           className="hover:text-red-400"
                           style={{ color: 'var(--color-text-muted)' }}

@@ -259,7 +259,9 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
                         </span>
                         <button
                           onClick={() => {
-                            onUpdateAction({ ...action, updates: (action.updates ?? []).filter(u => u.id !== update.id) });
+                            if (window.confirm('Delete this update? This cannot be undone.')) {
+                              onUpdateAction({ ...action, updates: (action.updates ?? []).filter(u => u.id !== update.id) });
+                            }
                           }}
                           className="hover:text-red-400"
                           style={{ color: 'var(--color-text-muted)' }}
