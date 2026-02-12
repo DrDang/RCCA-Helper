@@ -391,11 +391,14 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                 <XCircle size={14} />
                             </button>
                         </div>
-                        <input
-                            className="font-semibold w-full mb-2 bg-transparent outline-none pr-16"
-                            style={{ color: colors.text }}
+                        <textarea
+                            className="font-semibold w-full mb-2 bg-transparent outline-none pr-16 resize-none overflow-hidden break-words"
+                            style={{ color: colors.text, wordBreak: 'break-word' }}
                             value={action.action}
                             onChange={(e) => onUpdateAction({...action, action: e.target.value})}
+                            rows={1}
+                            ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                            onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
                         />
                         <div className="grid grid-cols-2 gap-2 mb-2">
                             <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -693,12 +696,15 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                     >
                         {/* Header row */}
                         <div className="flex items-start justify-between gap-2 mb-2">
-                            <input
-                                className="font-semibold flex-1 bg-transparent outline-none pr-16"
-                                style={{ color: colors.text }}
+                            <textarea
+                                className="font-semibold flex-1 bg-transparent outline-none pr-16 resize-none overflow-hidden break-words"
+                                style={{ color: colors.text, wordBreak: 'break-word' }}
                                 value={resolution.title}
                                 onChange={(e) => onUpdateResolution({...resolution, title: e.target.value})}
                                 placeholder="Resolution title..."
+                                rows={1}
+                                ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+                                onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
                             />
                             <div className="absolute top-2 right-2 flex items-center gap-1">
                                 <span
@@ -771,21 +777,22 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                             {RESOLUTION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
 
+                        {/* Description - always visible */}
+                        <div className="mb-2">
+                            <label className="text-[10px] uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Description</label>
+                            <textarea
+                                className="w-full text-xs p-2 rounded resize-none mt-1"
+                                style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)' }}
+                                rows={2}
+                                value={resolution.description}
+                                onChange={(e) => onUpdateResolution({...resolution, description: e.target.value})}
+                                placeholder="Describe the corrective action..."
+                            />
+                        </div>
+
                         {/* Expanded content */}
                         {isExpanded && (
                             <div className="space-y-3 pt-2" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
-                                <div>
-                                    <label className="text-[10px] uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Description</label>
-                                    <textarea
-                                        className="w-full text-xs p-2 rounded resize-none mt-1"
-                                        style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)' }}
-                                        rows={2}
-                                        value={resolution.description}
-                                        onChange={(e) => onUpdateResolution({...resolution, description: e.target.value})}
-                                        placeholder="Describe the corrective action..."
-                                    />
-                                </div>
-
                                 <div>
                                     <label className="text-[10px] uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Verification Method</label>
                                     <textarea

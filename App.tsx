@@ -602,7 +602,7 @@ const App: React.FC = () => {
                   actions={actions}
                   resolutions={resolutions}
                   treeName={activeTree?.name}
-                  onSelectNode={(node) => setSelectedNodeId(node.id)}
+                  onSelectNode={(node) => { setSelectedNodeId(node.id); setInspectorOpen(true); }}
                   onAddNode={addChildNode}
               />
           </div>

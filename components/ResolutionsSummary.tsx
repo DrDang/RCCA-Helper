@@ -15,7 +15,10 @@ import {
     FileText,
     ExternalLink,
     MessageSquarePlus,
-    ChevronRight
+    ChevronRight,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown
 } from 'lucide-react';
 
 const RESOLUTION_STATUSES: ResolutionStatus[] = [
@@ -29,6 +32,28 @@ const RESOLUTION_STATUS_ORDER: Record<string, number> = {
   'Implemented': 3,
   'Verified': 4,
   'Closed': 5,
+};
+
+type DueDateFilter = 'all' | 'overdue' | 'due-today' | 'due-this-week' | 'no-date';
+
+const isOverdueDate = (targetDate: string, status: string) => {
+  if (!targetDate || status === 'Verified' || status === 'Closed') return false;
+  return new Date(targetDate) < new Date(new Date().toDateString());
+};
+
+const isDueToday = (targetDate: string) => {
+  if (!targetDate) return false;
+  const today = new Date().toDateString();
+  return new Date(targetDate).toDateString() === today;
+};
+
+const isDueThisWeek = (targetDate: string) => {
+  if (!targetDate) return false;
+  const today = new Date();
+  const endOfWeek = new Date(today);
+  endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+  const due = new Date(targetDate);
+  return due >= new Date(today.toDateString()) && due <= endOfWeek;
 };
 
 interface ResolutionsSummaryProps {
@@ -53,6 +78,9 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
   onGenerateReport
 }) => {
   const [statusFilter, setStatusFilter] = useState<ResolutionStatus | 'all'>('all');
+  const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>('all');
+  const [sortBy, setSortBy] = useState<'status' | 'targetDate'>('status');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [expandedResolutionId, setExpandedResolutionId] = useState<string | null>(null);
   const [expandedResolutionUpdates, setExpandedResolutionUpdates] = useState<Record<string, boolean>>({});
   const [expandedRootCauseLinks, setExpandedRootCauseLinks] = useState<Record<string, boolean>>({});
@@ -61,7 +89,27 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
   // Filter and sort resolutions
   const filteredResolutions = resolutions
     .filter(r => statusFilter === 'all' || r.status === statusFilter)
-    .sort((a, b) => (RESOLUTION_STATUS_ORDER[a.status] ?? 99) - (RESOLUTION_STATUS_ORDER[b.status] ?? 99));
+    .filter(r => {
+      if (dueDateFilter === 'all') return true;
+      if (dueDateFilter === 'overdue') return isOverdueDate(r.targetDate, r.status);
+      if (dueDateFilter === 'due-today') return isDueToday(r.targetDate);
+      if (dueDateFilter === 'due-this-week') return isDueThisWeek(r.targetDate);
+      if (dueDateFilter === 'no-date') return !r.targetDate;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'status') {
+        const diff = (RESOLUTION_STATUS_ORDER[a.status] ?? 99) - (RESOLUTION_STATUS_ORDER[b.status] ?? 99);
+        return sortDirection === 'asc' ? diff : -diff;
+      } else {
+        // Sort by target date
+        if (!a.targetDate && !b.targetDate) return 0;
+        if (!a.targetDate) return sortDirection === 'asc' ? 1 : -1;
+        if (!b.targetDate) return sortDirection === 'asc' ? -1 : 1;
+        const diff = new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime();
+        return sortDirection === 'asc' ? diff : -diff;
+      }
+    });
 
   // Calculate stats
   const statusCounts = RESOLUTION_STATUSES.reduce((acc, status) => {
@@ -114,13 +162,16 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex-1">
-            <input
-              className="font-semibold text-base w-full bg-transparent outline-none"
-              style={{ color: colors.text }}
+          <div className="flex-1 min-w-0">
+            <textarea
+              className="font-semibold text-base w-full bg-transparent outline-none resize-none overflow-hidden break-words"
+              style={{ color: colors.text, wordBreak: 'break-word' }}
               value={resolution.title}
               onChange={(e) => onUpdateResolution({...resolution, title: e.target.value})}
               placeholder="Resolution title..."
+              rows={1}
+              ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+              onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
             />
             {isOverdue && (
               <div className="flex items-center gap-1 text-xs text-red-600 mt-1">
@@ -183,6 +234,19 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
           </div>
         </div>
 
+        {/* Description - always visible */}
+        <div className="mt-3">
+          <label className="text-xs uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Description</label>
+          <textarea
+            className="w-full text-sm p-2 rounded resize-none mt-1"
+            style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-primary)' }}
+            rows={2}
+            value={resolution.description}
+            onChange={(e) => onUpdateResolution({...resolution, description: e.target.value})}
+            placeholder="Describe the corrective action..."
+          />
+        </div>
+
         {/* Linked root causes preview */}
         <div className="mt-2 flex flex-wrap gap-1">
           {resolution.linkedCauseIds.map(id => (
@@ -202,18 +266,6 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
         {/* Expanded content */}
         {isExpanded && (
           <div className="mt-4 pt-4 space-y-4" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
-            <div>
-              <label className="text-xs uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Description</label>
-              <textarea
-                className="w-full text-sm p-2 rounded resize-none mt-1"
-                style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-primary)' }}
-                rows={3}
-                value={resolution.description}
-                onChange={(e) => onUpdateResolution({...resolution, description: e.target.value})}
-                placeholder="Describe the corrective action..."
-              />
-            </div>
-
             <div>
               <label className="text-xs uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Verification Method</label>
               <textarea
@@ -491,8 +543,8 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
           </div>
         )}
 
-        {/* Filter */}
-        <div className="flex items-center gap-2 mb-4">
+        {/* Filters and Sort */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <Filter size={14} style={{ color: 'var(--color-text-muted)' }} />
           <select
             value={statusFilter}
@@ -505,6 +557,39 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
               <option key={s} value={s}>{s} ({statusCounts[s]})</option>
             ))}
           </select>
+          <select
+            value={dueDateFilter}
+            onChange={(e) => setDueDateFilter(e.target.value as DueDateFilter)}
+            className="text-sm rounded px-2 py-1"
+            style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}
+          >
+            <option value="all">All Target Dates</option>
+            <option value="overdue">Overdue</option>
+            <option value="due-today">Due Today</option>
+            <option value="due-this-week">Due This Week</option>
+            <option value="no-date">No Target Date</option>
+          </select>
+
+          <div className="flex items-center gap-1 ml-2" style={{ borderLeft: '1px solid var(--color-border-primary)', paddingLeft: '0.5rem' }}>
+            <ArrowUpDown size={14} style={{ color: 'var(--color-text-muted)' }} />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'status' | 'targetDate')}
+              className="text-sm rounded px-2 py-1"
+              style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}
+            >
+              <option value="status">Sort by Status</option>
+              <option value="targetDate">Sort by Target Date</option>
+            </select>
+            <button
+              onClick={() => setSortDirection(d => d === 'asc' ? 'desc' : 'asc')}
+              className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              style={{ color: 'var(--color-text-secondary)' }}
+              title={sortDirection === 'asc' ? 'Ascending (click to change)' : 'Descending (click to change)'}
+            >
+              {sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+            </button>
+          </div>
         </div>
 
         {/* Resolution cards */}

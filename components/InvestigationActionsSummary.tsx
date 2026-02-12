@@ -13,7 +13,10 @@ import {
     FileText,
     ExternalLink,
     MessageSquarePlus,
-    ChevronRight
+    ChevronRight,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown
 } from 'lucide-react';
 
 const ACTION_STATUSES: ActionItem['status'][] = [
@@ -34,6 +37,28 @@ const ACTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: s
   'Complete': { bg: 'var(--color-action-complete-bg)', border: 'var(--color-action-complete-border)', text: 'var(--color-action-complete-text)' },
   'Blocked': { bg: 'var(--color-action-blocked-bg)', border: 'var(--color-action-blocked-border)', text: 'var(--color-action-blocked-text)' },
   'Closed': { bg: 'var(--color-action-closed-bg)', border: 'var(--color-action-closed-border)', text: 'var(--color-action-closed-text)' },
+};
+
+type DueDateFilter = 'all' | 'overdue' | 'due-today' | 'due-this-week' | 'no-date';
+
+const isOverdue = (dueDate: string, status: string) => {
+  if (!dueDate || status === 'Complete' || status === 'Closed') return false;
+  return new Date(dueDate) < new Date(new Date().toDateString());
+};
+
+const isDueToday = (dueDate: string) => {
+  if (!dueDate) return false;
+  const today = new Date().toDateString();
+  return new Date(dueDate).toDateString() === today;
+};
+
+const isDueThisWeek = (dueDate: string) => {
+  if (!dueDate) return false;
+  const today = new Date();
+  const endOfWeek = new Date(today);
+  endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+  const due = new Date(dueDate);
+  return due >= new Date(today.toDateString()) && due <= endOfWeek;
 };
 
 interface InvestigationActionsSummaryProps {
@@ -58,13 +83,36 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
   onGenerateReport
 }) => {
   const [statusFilter, setStatusFilter] = useState<ActionItem['status'] | 'all'>('all');
+  const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>('all');
+  const [sortBy, setSortBy] = useState<'status' | 'dueDate'>('status');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [expandedActionUpdates, setExpandedActionUpdates] = useState<Record<string, boolean>>({});
   const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
 
   const filteredActions = actions
     .filter(a => statusFilter === 'all' || a.status === statusFilter)
-    .sort((a, b) => (ACTION_STATUS_ORDER[a.status] ?? 99) - (ACTION_STATUS_ORDER[b.status] ?? 99));
+    .filter(a => {
+      if (dueDateFilter === 'all') return true;
+      if (dueDateFilter === 'overdue') return isOverdue(a.dueDate, a.status);
+      if (dueDateFilter === 'due-today') return isDueToday(a.dueDate);
+      if (dueDateFilter === 'due-this-week') return isDueThisWeek(a.dueDate);
+      if (dueDateFilter === 'no-date') return !a.dueDate;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'status') {
+        const diff = (ACTION_STATUS_ORDER[a.status] ?? 99) - (ACTION_STATUS_ORDER[b.status] ?? 99);
+        return sortDirection === 'asc' ? diff : -diff;
+      } else {
+        // Sort by due date
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return sortDirection === 'asc' ? 1 : -1;
+        if (!b.dueDate) return sortDirection === 'asc' ? -1 : 1;
+        const diff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        return sortDirection === 'asc' ? diff : -diff;
+      }
+    });
 
   const statusCounts = ACTION_STATUSES.reduce((acc, status) => {
     acc[status] = actions.filter(a => a.status === status).length;
@@ -97,13 +145,16 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex-1">
-            <input
-              className="font-semibold text-base w-full bg-transparent outline-none"
-              style={{ color: colors.text }}
+          <div className="flex-1 min-w-0">
+            <textarea
+              className="font-semibold text-base w-full bg-transparent outline-none resize-none overflow-hidden break-words"
+              style={{ color: colors.text, wordBreak: 'break-word' }}
               value={action.action}
               onChange={(e) => onUpdateAction({...action, action: e.target.value})}
               placeholder="Action title..."
+              rows={1}
+              ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } }}
+              onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
             />
             {isOverdue && (
               <div className="flex items-center gap-1 text-xs text-red-600 mt-1">
@@ -166,6 +217,19 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
           </div>
         </div>
 
+        {/* Rationale - always visible */}
+        <div className="mt-3">
+          <label className="text-xs uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Rationale</label>
+          <textarea
+            className="w-full text-sm p-2 rounded resize-none mt-1"
+            style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-primary)' }}
+            rows={2}
+            value={action.rationale}
+            onChange={(e) => onUpdateAction({...action, rationale: e.target.value})}
+            placeholder="Why is this action needed?"
+          />
+        </div>
+
         {/* Linked cause */}
         <div className="mt-2">
           <button
@@ -182,18 +246,6 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
         {/* Expanded content */}
         {isExpanded && (
           <div className="mt-4 pt-4 space-y-4" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
-            <div>
-              <label className="text-xs uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Rationale</label>
-              <textarea
-                className="w-full text-sm p-2 rounded resize-none mt-1"
-                style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border-primary)' }}
-                rows={3}
-                value={action.rationale}
-                onChange={(e) => onUpdateAction({...action, rationale: e.target.value})}
-                placeholder="Why is this action needed?"
-              />
-            </div>
-
             {/* Updates / Activity Log */}
             <div className="pt-3" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
               <button
@@ -331,8 +383,8 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
           </div>
         </div>
 
-        {/* Filter */}
-        <div className="flex items-center gap-2 mb-4">
+        {/* Filters and Sort */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <Filter size={14} style={{ color: 'var(--color-text-muted)' }} />
           <select
             value={statusFilter}
@@ -345,6 +397,39 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
               <option key={s} value={s}>{s} ({statusCounts[s] ?? 0})</option>
             ))}
           </select>
+          <select
+            value={dueDateFilter}
+            onChange={(e) => setDueDateFilter(e.target.value as DueDateFilter)}
+            className="text-sm rounded px-2 py-1"
+            style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}
+          >
+            <option value="all">All Due Dates</option>
+            <option value="overdue">Overdue</option>
+            <option value="due-today">Due Today</option>
+            <option value="due-this-week">Due This Week</option>
+            <option value="no-date">No Due Date</option>
+          </select>
+
+          <div className="flex items-center gap-1 ml-2" style={{ borderLeft: '1px solid var(--color-border-primary)', paddingLeft: '0.5rem' }}>
+            <ArrowUpDown size={14} style={{ color: 'var(--color-text-muted)' }} />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'status' | 'dueDate')}
+              className="text-sm rounded px-2 py-1"
+              style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}
+            >
+              <option value="status">Sort by Status</option>
+              <option value="dueDate">Sort by Due Date</option>
+            </select>
+            <button
+              onClick={() => setSortDirection(d => d === 'asc' ? 'desc' : 'asc')}
+              className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              style={{ color: 'var(--color-text-secondary)' }}
+              title={sortDirection === 'asc' ? 'Ascending (click to change)' : 'Descending (click to change)'}
+            >
+              {sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+            </button>
+          </div>
         </div>
 
         {/* Action cards */}
