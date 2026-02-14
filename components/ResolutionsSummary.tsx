@@ -18,7 +18,9 @@ import {
     ChevronRight,
     ArrowUpDown,
     ArrowUp,
-    ArrowDown
+    ArrowDown,
+    Pencil,
+    Check
 } from 'lucide-react';
 
 const RESOLUTION_STATUSES: ResolutionStatus[] = [
@@ -85,6 +87,8 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
   const [expandedResolutionUpdates, setExpandedResolutionUpdates] = useState<Record<string, boolean>>({});
   const [expandedRootCauseLinks, setExpandedRootCauseLinks] = useState<Record<string, boolean>>({});
   const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
+  const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null);
+  const [editingUpdateText, setEditingUpdateText] = useState('');
 
   // Filter and sort resolutions
   const filteredResolutions = resolutions
@@ -436,20 +440,72 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
                         <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
                           {new Date(update.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        <button
-                          onClick={() => {
-                            if (window.confirm('Delete this update? This cannot be undone.')) {
-                              onUpdateResolution({ ...resolution, updates: (resolution.updates ?? []).filter(u => u.id !== update.id) });
+                        <div className="flex items-center gap-1">
+                          {editingUpdateId === update.id ? (
+                            <button
+                              onClick={() => {
+                                if (editingUpdateText.trim()) {
+                                  onUpdateResolution({
+                                    ...resolution,
+                                    updates: (resolution.updates ?? []).map(u =>
+                                      u.id === update.id ? { ...u, content: editingUpdateText.trim() } : u
+                                    )
+                                  });
+                                }
+                                setEditingUpdateId(null);
+                                setEditingUpdateText('');
+                              }}
+                              className="hover:text-green-500"
+                              style={{ color: 'var(--color-text-muted)' }}
+                              title="Save"
+                            >
+                              <Check size={12} />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditingUpdateId(update.id);
+                                setEditingUpdateText(update.content);
+                              }}
+                              className="hover:text-indigo-500"
+                              style={{ color: 'var(--color-text-muted)' }}
+                              title="Edit update"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Delete this update? This cannot be undone.')) {
+                                onUpdateResolution({ ...resolution, updates: (resolution.updates ?? []).filter(u => u.id !== update.id) });
+                              }
+                            }}
+                            className="hover:text-red-400"
+                            style={{ color: 'var(--color-text-muted)' }}
+                            title="Delete update"
+                          >
+                            <XCircle size={12} />
+                          </button>
+                        </div>
+                      </div>
+                      {editingUpdateId === update.id ? (
+                        <textarea
+                          value={editingUpdateText}
+                          onChange={(e) => setEditingUpdateText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              setEditingUpdateId(null);
+                              setEditingUpdateText('');
                             }
                           }}
-                          className="hover:text-red-400"
-                          style={{ color: 'var(--color-text-muted)' }}
-                          title="Delete update"
-                        >
-                          <XCircle size={12} />
-                        </button>
-                      </div>
-                      <p style={{ color: 'var(--color-text-secondary)' }}>{update.content}</p>
+                          className="w-full p-2 text-sm rounded border resize-none"
+                          style={{ backgroundColor: 'var(--color-surface-secondary)', color: 'var(--color-text-primary)', borderColor: 'var(--color-border-primary)' }}
+                          rows={2}
+                          autoFocus
+                        />
+                      ) : (
+                        <p style={{ color: 'var(--color-text-secondary)' }}>{update.content}</p>
+                      )}
                     </div>
                   ))}
                 </div>

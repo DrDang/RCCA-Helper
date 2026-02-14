@@ -18,7 +18,9 @@ import {
     X,
     GripVertical,
     MessageSquarePlus,
-    ChevronRight
+    ChevronRight,
+    Pencil,
+    Check
 } from 'lucide-react';
 
 const ACTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -100,6 +102,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   const [expandedActionUpdates, setExpandedActionUpdates] = useState<Record<string, boolean>>({});
   const [expandedResolutionUpdates, setExpandedResolutionUpdates] = useState<Record<string, boolean>>({});
   const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
+  const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null);
+  const [editingUpdateText, setEditingUpdateText] = useState('');
   const [isResizing, setIsResizing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -508,18 +512,70 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                                 <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
                                                     {new Date(update.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                 </span>
-                                                <button
-                                                    onClick={() => {
-                                                        onUpdateAction({ ...action, updates: (action.updates ?? []).filter(u => u.id !== update.id) });
-                                                    }}
-                                                    className="hover:text-red-400"
-                                                    style={{ color: 'var(--color-text-muted)' }}
-                                                    title="Delete update"
-                                                >
-                                                    <XCircle size={10} />
-                                                </button>
+                                                <div className="flex items-center gap-1">
+                                                    {editingUpdateId === update.id ? (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (editingUpdateText.trim()) {
+                                                                    onUpdateAction({
+                                                                        ...action,
+                                                                        updates: (action.updates ?? []).map(u =>
+                                                                            u.id === update.id ? { ...u, content: editingUpdateText.trim() } : u
+                                                                        )
+                                                                    });
+                                                                }
+                                                                setEditingUpdateId(null);
+                                                                setEditingUpdateText('');
+                                                            }}
+                                                            className="hover:text-green-500"
+                                                            style={{ color: 'var(--color-text-muted)' }}
+                                                            title="Save"
+                                                        >
+                                                            <Check size={10} />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingUpdateId(update.id);
+                                                                setEditingUpdateText(update.content);
+                                                            }}
+                                                            className="hover:text-indigo-500"
+                                                            style={{ color: 'var(--color-text-muted)' }}
+                                                            title="Edit update"
+                                                        >
+                                                            <Pencil size={10} />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => {
+                                                            onUpdateAction({ ...action, updates: (action.updates ?? []).filter(u => u.id !== update.id) });
+                                                        }}
+                                                        className="hover:text-red-400"
+                                                        style={{ color: 'var(--color-text-muted)' }}
+                                                        title="Delete update"
+                                                    >
+                                                        <XCircle size={10} />
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <p style={{ color: 'var(--color-text-secondary)' }}>{update.content}</p>
+                                            {editingUpdateId === update.id ? (
+                                                <textarea
+                                                    value={editingUpdateText}
+                                                    onChange={(e) => setEditingUpdateText(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Escape') {
+                                                            setEditingUpdateId(null);
+                                                            setEditingUpdateText('');
+                                                        }
+                                                    }}
+                                                    className="w-full p-1.5 text-xs rounded border resize-none"
+                                                    style={{ backgroundColor: 'var(--color-surface-secondary)', color: 'var(--color-text-primary)', borderColor: 'var(--color-border-primary)' }}
+                                                    rows={2}
+                                                    autoFocus
+                                                />
+                                            ) : (
+                                                <p style={{ color: 'var(--color-text-secondary)' }}>{update.content}</p>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -934,18 +990,70 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                                         <span className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
                                                             {new Date(update.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                         </span>
-                                                        <button
-                                                            onClick={() => {
-                                                                onUpdateResolution({ ...resolution, updates: (resolution.updates ?? []).filter(u => u.id !== update.id) });
-                                                            }}
-                                                            className="hover:text-red-400"
-                                                            style={{ color: 'var(--color-text-muted)' }}
-                                                            title="Delete update"
-                                                        >
-                                                            <XCircle size={10} />
-                                                        </button>
+                                                        <div className="flex items-center gap-1">
+                                                            {editingUpdateId === update.id ? (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (editingUpdateText.trim()) {
+                                                                            onUpdateResolution({
+                                                                                ...resolution,
+                                                                                updates: (resolution.updates ?? []).map(u =>
+                                                                                    u.id === update.id ? { ...u, content: editingUpdateText.trim() } : u
+                                                                                )
+                                                                            });
+                                                                        }
+                                                                        setEditingUpdateId(null);
+                                                                        setEditingUpdateText('');
+                                                                    }}
+                                                                    className="hover:text-green-500"
+                                                                    style={{ color: 'var(--color-text-muted)' }}
+                                                                    title="Save"
+                                                                >
+                                                                    <Check size={10} />
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setEditingUpdateId(update.id);
+                                                                        setEditingUpdateText(update.content);
+                                                                    }}
+                                                                    className="hover:text-indigo-500"
+                                                                    style={{ color: 'var(--color-text-muted)' }}
+                                                                    title="Edit update"
+                                                                >
+                                                                    <Pencil size={10} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => {
+                                                                    onUpdateResolution({ ...resolution, updates: (resolution.updates ?? []).filter(u => u.id !== update.id) });
+                                                                }}
+                                                                className="hover:text-red-400"
+                                                                style={{ color: 'var(--color-text-muted)' }}
+                                                                title="Delete update"
+                                                            >
+                                                                <XCircle size={10} />
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <p style={{ color: 'var(--color-text-secondary)' }}>{update.content}</p>
+                                                    {editingUpdateId === update.id ? (
+                                                        <textarea
+                                                            value={editingUpdateText}
+                                                            onChange={(e) => setEditingUpdateText(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Escape') {
+                                                                    setEditingUpdateId(null);
+                                                                    setEditingUpdateText('');
+                                                                }
+                                                            }}
+                                                            className="w-full p-1.5 text-xs rounded border resize-none"
+                                                            style={{ backgroundColor: 'var(--color-surface-secondary)', color: 'var(--color-text-primary)', borderColor: 'var(--color-border-primary)' }}
+                                                            rows={2}
+                                                            autoFocus
+                                                        />
+                                                    ) : (
+                                                        <p style={{ color: 'var(--color-text-secondary)' }}>{update.content}</p>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
