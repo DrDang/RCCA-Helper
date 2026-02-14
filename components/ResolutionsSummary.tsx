@@ -38,6 +38,25 @@ const RESOLUTION_STATUS_ORDER: Record<string, number> = {
 
 type DueDateFilter = 'all' | 'overdue' | 'due-today' | 'due-this-week' | 'no-date';
 
+// Generate unique title like "New Resolution 1", "New Resolution 2", etc.
+const getNextUniqueTitle = (prefix: string, existingTitles: string[]): string => {
+  const pattern = new RegExp(`^${prefix}(?: (\\d+))?$`);
+  const usedNumbers = new Set<number>();
+
+  existingTitles.forEach(title => {
+    const match = title.match(pattern);
+    if (match) {
+      usedNumbers.add(match[1] ? parseInt(match[1], 10) : 1);
+    }
+  });
+
+  let nextNum = 1;
+  while (usedNumbers.has(nextNum)) {
+    nextNum++;
+  }
+  return `${prefix} ${nextNum}`;
+};
+
 const isOverdueDate = (targetDate: string, status: string) => {
   if (!targetDate || status === 'Verified' || status === 'Closed') return false;
   return new Date(targetDate) < new Date(new Date().toDateString());
@@ -132,7 +151,7 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
   const createNewResolution = (): ResolutionItem => ({
     id: crypto.randomUUID(),
     linkedCauseIds: allRootCauses.length > 0 ? [allRootCauses[0].id] : [],
-    title: 'New Resolution',
+    title: getNextUniqueTitle('New Resolution', resolutions.map(r => r.title)),
     description: '',
     owner: 'Unassigned',
     targetDate: '',

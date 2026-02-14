@@ -105,3 +105,25 @@ export interface AppState {
   activeTreeId: string | null;
   trees: SavedTree[];
 }
+
+// V2 types with Projects support
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SavedTreeV2 extends SavedTree {
+  projectId: string;
+}
+
+export interface AppStateV2 {
+  version: 2;
+  activeProjectId: string | null;
+  activeTreeId: string | null;
+  projects: Project[];
+  trees: SavedTreeV2[];
+}

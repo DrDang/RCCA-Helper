@@ -2,19 +2,22 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TreeVisualizer } from './components/TreeVisualizer';
 import { InspectorPanel } from './components/InspectorPanel';
 import { TreeManager } from './components/TreeManager';
+import { ProjectSelector } from './components/ProjectSelector';
 import { DashboardView } from './components/DashboardView';
 import { ResolutionsSummary } from './components/ResolutionsSummary';
 import { InvestigationActionsSummary } from './components/InvestigationActionsSummary';
-import { CauseNode, ActionItem, Note, NodeStatus, NodeType, SavedTree, AppSettings, ResolutionItem } from './types';
+import { CauseNode, ActionItem, Note, NodeStatus, NodeType, SavedTree, SavedTreeV2, AppSettings, ResolutionItem, Project } from './types';
 import { createInitialTree } from './constants';
-import { loadAppState, saveAppState, exportTreeAsJson, exportAllTreesAsJson, parseImportFile, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS } from './persistence';
+import { loadAppState, saveAppState, exportTreeAsJson, exportAllTreesAsJson, parseImportFile, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS, createDefaultProject, exportProjectAsJson, parseProjectImportFile, ProjectImportData } from './persistence';
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
 import { SettingsModal } from './components/SettingsModal';
 import { ImportDialog } from './components/ImportDialog';
 import { GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun, Shield, ClipboardList, PanelRightOpen } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [trees, setTrees] = useState<SavedTree[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [trees, setTrees] = useState<SavedTreeV2[]>([]);
   const [activeTreeId, setActiveTreeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
@@ -30,12 +33,17 @@ const App: React.FC = () => {
   // Load from localStorage on mount
   useEffect(() => {
     const saved = loadAppState();
-    if (saved && saved.trees.length > 0) {
+    if (saved && saved.projects.length > 0) {
+      setProjects(saved.projects);
       setTrees(saved.trees);
-      setActiveTreeId(saved.activeTreeId ?? saved.trees[0].id);
+      setActiveProjectId(saved.activeProjectId ?? saved.projects[0].id);
+      setActiveTreeId(saved.activeTreeId);
     } else {
-      const defaultTree: SavedTree = {
+      // First time: create default project with one investigation
+      const defaultProject = createDefaultProject();
+      const defaultTree: SavedTreeV2 = {
         id: crypto.randomUUID(),
+        projectId: defaultProject.id,
         name: 'New Investigation',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -44,7 +52,9 @@ const App: React.FC = () => {
         notes: [],
         resolutions: []
       };
+      setProjects([defaultProject]);
       setTrees([defaultTree]);
+      setActiveProjectId(defaultProject.id);
       setActiveTreeId(defaultTree.id);
     }
     const savedSettings = loadSettings();
@@ -97,18 +107,22 @@ const App: React.FC = () => {
   // Debounced auto-save to localStorage
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!initialized || trees.length === 0) return;
+    if (!initialized || projects.length === 0) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      saveAppState({ activeTreeId, trees });
+      saveAppState({ version: 2, activeProjectId, activeTreeId, projects, trees });
     }, 500);
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [trees, activeTreeId, initialized]);
+  }, [trees, projects, activeTreeId, activeProjectId, initialized]);
+
+  // Derive active project and its trees
+  const activeProject = projects.find(p => p.id === activeProjectId) ?? null;
+  const projectTrees = trees.filter(t => t.projectId === activeProjectId);
 
   // Derive active tree data
-  const activeTree = trees.find(t => t.id === activeTreeId) ?? null;
+  const activeTree = projectTrees.find(t => t.id === activeTreeId) ?? null;
   const treeData = activeTree?.treeData ?? null;
   const actions = activeTree?.actions ?? [];
   const notes = activeTree?.notes ?? [];
@@ -300,12 +314,130 @@ const App: React.FC = () => {
     }));
   };
 
+  // Project management handlers
+  const handleCreateProject = () => {
+    const name = prompt('Project name:', 'New Project');
+    if (!name) return;
+    const newProject: Project = {
+      id: crypto.randomUUID(),
+      name,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setProjects(prev => [...prev, newProject]);
+    setActiveProjectId(newProject.id);
+    setActiveTreeId(null);
+    setSelectedNodeId(null);
+  };
+
+  const handleDeleteProject = (id: string) => {
+    if (projects.length <= 1) {
+      alert('Cannot delete the last project.');
+      return;
+    }
+    const project = projects.find(p => p.id === id);
+    const treeCount = trees.filter(t => t.projectId === id).length;
+    const message = treeCount > 0
+      ? `Delete project "${project?.name}" and its ${treeCount} investigation(s)? This cannot be undone.`
+      : `Delete project "${project?.name}"? This cannot be undone.`;
+    if (!window.confirm(message)) return;
+
+    setProjects(prev => prev.filter(p => p.id !== id));
+    setTrees(prev => prev.filter(t => t.projectId !== id));
+
+    if (activeProjectId === id) {
+      const remaining = projects.filter(p => p.id !== id);
+      setActiveProjectId(remaining[0]?.id ?? null);
+      setActiveTreeId(null);
+    }
+    setSelectedNodeId(null);
+  };
+
+  const handleRenameProject = (id: string, newName: string) => {
+    setProjects(prev => prev.map(p =>
+      p.id === id ? { ...p, name: newName, updatedAt: new Date().toISOString() } : p
+    ));
+  };
+
+  const handleSelectProject = (id: string) => {
+    setActiveProjectId(id);
+    // Select first tree in new project, if any
+    const projectTreeList = trees.filter(t => t.projectId === id);
+    setActiveTreeId(projectTreeList[0]?.id ?? null);
+    setSelectedNodeId(null);
+    setCurrentView('tree');
+  };
+
+  const handleExportProject = (id: string) => {
+    const project = projects.find(p => p.id === id);
+    if (project) {
+      exportProjectAsJson(project, trees);
+      setLastExportTimestamp();
+      setLastExportTs(new Date().toISOString());
+      setHasUnsavedChanges(false);
+    }
+  };
+
+  const handleImportProject = async (file: File) => {
+    try {
+      const result = await parseProjectImportFile(file);
+
+      if ('type' in result && result.type === 'rcca-project') {
+        // It's a project import
+        const importData = result as ProjectImportData;
+        const newProjectId = crypto.randomUUID();
+
+        // Check for project name conflict
+        const existingProject = projects.find(
+          p => p.name.trim().toLowerCase() === importData.project.name.trim().toLowerCase()
+        );
+
+        let projectName = importData.project.name;
+        if (existingProject) {
+          projectName = `${importData.project.name} (Imported)`;
+        }
+
+        const newProject: Project = {
+          ...importData.project,
+          id: newProjectId,
+          name: projectName,
+          updatedAt: new Date().toISOString(),
+        };
+
+        const importedTrees: SavedTreeV2[] = importData.trees.map(t => ({
+          ...t,
+          id: crypto.randomUUID(),
+          projectId: newProjectId,
+        }));
+
+        setProjects(prev => [...prev, newProject]);
+        setTrees(prev => [...prev, ...importedTrees]);
+        setActiveProjectId(newProjectId);
+        setActiveTreeId(importedTrees[0]?.id ?? null);
+        setSelectedNodeId(null);
+      } else {
+        // Legacy tree import - add to current project via existing flow
+        setImportCandidates(result as SavedTree[]);
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to import file');
+    }
+  };
+
+  // Compute tree counts per project
+  const projectTreeCounts: Record<string, number> = {};
+  for (const project of projects) {
+    projectTreeCounts[project.id] = trees.filter(t => t.projectId === project.id).length;
+  }
+
   // Tree management handlers
   const handleCreateTree = () => {
+    if (!activeProjectId) return;
     const name = prompt('Investigation name:', 'New Investigation');
     if (!name) return;
-    const newTree: SavedTree = {
+    const newTree: SavedTreeV2 = {
       id: crypto.randomUUID(),
+      projectId: activeProjectId,
       name,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -320,16 +452,14 @@ const App: React.FC = () => {
   };
 
   const handleDeleteTree = (id: string) => {
-    if (trees.length <= 1) {
-      alert('Cannot delete the last investigation. Create another one first.');
-      return;
-    }
     const tree = trees.find(t => t.id === id);
     if (!window.confirm(`Delete investigation "${tree?.name}"? This cannot be undone.`)) return;
     const remaining = trees.filter(t => t.id !== id);
     setTrees(remaining);
     if (activeTreeId === id) {
-      setActiveTreeId(remaining[0]?.id ?? null);
+      // Select next tree in same project
+      const projectRemaining = remaining.filter(t => t.projectId === activeProjectId);
+      setActiveTreeId(projectRemaining[0]?.id ?? null);
     }
     setSelectedNodeId(null);
   };
@@ -356,6 +486,7 @@ const App: React.FC = () => {
   };
 
   const handleImportConfirm = (selected: SavedTree[], conflictMode: 'append' | 'overwrite') => {
+    if (!activeProjectId) return;
     let firstResultId: string | null = null;
 
     setTrees(prev => {
@@ -363,8 +494,9 @@ const App: React.FC = () => {
 
       for (const importedTree of selected) {
         const normalizedName = importedTree.name.trim().toLowerCase();
+        // Only check for conflicts within current project
         const existingIndex = updatedTrees.findIndex(
-          t => t.name.trim().toLowerCase() === normalizedName
+          t => t.projectId === activeProjectId && t.name.trim().toLowerCase() === normalizedName
         );
 
         if (existingIndex !== -1 && conflictMode === 'overwrite') {
@@ -372,12 +504,13 @@ const App: React.FC = () => {
           updatedTrees[existingIndex] = {
             ...importedTree,
             id: existingId,
+            projectId: activeProjectId,
             updatedAt: new Date().toISOString(),
-          };
+          } as SavedTreeV2;
           if (!firstResultId) firstResultId = existingId;
         } else {
           const newId = crypto.randomUUID();
-          updatedTrees.push({ ...importedTree, id: newId });
+          updatedTrees.push({ ...importedTree, id: newId, projectId: activeProjectId } as SavedTreeV2);
           if (!firstResultId) firstResultId = newId;
         }
       }
@@ -403,8 +536,8 @@ const App: React.FC = () => {
   };
 
   const handleExportAll = () => {
-    if (trees.length === 0) return;
-    exportAllTreesAsJson(trees);
+    if (projectTrees.length === 0) return;
+    exportAllTreesAsJson(projectTrees);
     setLastExportTimestamp();
     setLastExportTs(new Date().toISOString());
     setHasUnsavedChanges(false);
@@ -429,7 +562,7 @@ const App: React.FC = () => {
   };
 
   const handleGenerateBulkReport = () => {
-    if (trees.length > 0) openReportInNewTab(generateBulkReport(trees));
+    if (projectTrees.length > 0) openReportInNewTab(generateBulkReport(projectTrees));
   };
 
   const handleDashboardSelectTree = (id: string) => {
@@ -450,11 +583,11 @@ const App: React.FC = () => {
     <div className="w-screen h-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--color-surface-secondary)' }}>
       {/* Navbar */}
       <div className="h-16 flex items-center px-6 justify-between shadow-sm z-30" style={{ backgroundColor: 'var(--color-surface-primary)', borderBottom: '1px solid var(--color-border-primary)' }}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-shrink-0">
             <div className="bg-indigo-600 p-2 rounded-lg text-white">
                 <GitBranch size={24} />
             </div>
-            <div>
+            <div className="whitespace-nowrap">
                 <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>RCCA Helper</h1>
                 <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>Root Cause Analysis & Action Tracking</p>
             </div>
@@ -508,9 +641,22 @@ const App: React.FC = () => {
             </button>
           )}
 
+          {/* Project Selector */}
+          <ProjectSelector
+            projects={projects}
+            activeProjectId={activeProjectId}
+            projectTreeCounts={projectTreeCounts}
+            onSelectProject={handleSelectProject}
+            onCreateProject={handleCreateProject}
+            onDeleteProject={handleDeleteProject}
+            onRenameProject={handleRenameProject}
+            onExportProject={handleExportProject}
+            onImportProject={handleImportProject}
+          />
+
           {/* Tree Manager */}
           <TreeManager
-            trees={trees}
+            trees={projectTrees}
             activeTreeId={activeTreeId}
             onSelectTree={(id) => { setActiveTreeId(id); setSelectedNodeId(null); setCurrentView('tree'); }}
             onCreateTree={handleCreateTree}
@@ -560,7 +706,7 @@ const App: React.FC = () => {
       {/* Main Content */}
       {currentView === 'dashboard' ? (
         <DashboardView
-          trees={trees}
+          trees={projectTrees}
           onSelectTree={handleDashboardSelectTree}
           onGenerateReport={handleGenerateReport}
           onGenerateBulkReport={handleGenerateBulkReport}

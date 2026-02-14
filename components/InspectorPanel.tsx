@@ -54,6 +54,25 @@ const RESOLUTION_STATUSES: ResolutionStatus[] = [
   'Open', 'In Progress', 'On Hold', 'Implemented', 'Verified', 'Closed'
 ];
 
+// Generate unique title like "New Action 1", "New Action 2", etc.
+const getNextUniqueTitle = (prefix: string, existingTitles: string[]): string => {
+  const pattern = new RegExp(`^${prefix}(?: (\\d+))?$`);
+  const usedNumbers = new Set<number>();
+
+  existingTitles.forEach(title => {
+    const match = title.match(pattern);
+    if (match) {
+      usedNumbers.add(match[1] ? parseInt(match[1], 10) : 1);
+    }
+  });
+
+  let nextNum = 1;
+  while (usedNumbers.has(nextNum)) {
+    nextNum++;
+  }
+  return `${prefix} ${nextNum}`;
+};
+
 interface InspectorPanelProps {
   selectedNode: CauseNode | null;
   actions: ActionItem[];
@@ -596,7 +615,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                             onClick={() => onAddAction({
                                 id: crypto.randomUUID(),
                                 causeId: selectedNode.id,
-                                action: 'New Action',
+                                action: getNextUniqueTitle('New Action', actions.map(a => a.action)),
                                 rationale: '',
                                 assignee: 'Unassigned',
                                 assignedDate: new Date().toISOString().split('T')[0],
@@ -726,7 +745,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             const createNewResolution = (): ResolutionItem => ({
               id: crypto.randomUUID(),
               linkedCauseIds: [selectedNode.id],
-              title: 'New Resolution',
+              title: getNextUniqueTitle('New Resolution', resolutions.map(r => r.title)),
               description: '',
               owner: 'Unassigned',
               targetDate: '',
