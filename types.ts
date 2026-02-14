@@ -91,6 +91,7 @@ export interface SavedTree {
   actions: ActionItem[];
   notes: Note[];
   resolutions: ResolutionItem[];
+  isResolved?: boolean;  // True if investigation is complete and should not appear in daily tagups
 }
 
 export interface AppSettings {

@@ -340,6 +340,12 @@ const App: React.FC = () => {
     ));
   };
 
+  const handleToggleResolved = (id: string) => {
+    setTrees(prev => prev.map(t =>
+      t.id === id ? { ...t, isResolved: !t.isResolved, updatedAt: new Date().toISOString() } : t
+    ));
+  };
+
   const handleFileSelected = async (file: File) => {
     try {
       const parsed = await parseImportFile(file);
@@ -510,6 +516,7 @@ const App: React.FC = () => {
             onCreateTree={handleCreateTree}
             onDeleteTree={handleDeleteTree}
             onRenameTree={handleRenameTree}
+            onToggleResolved={handleToggleResolved}
             onFileSelected={handleFileSelected}
             onExportTree={handleExportTree}
             onExportAll={handleExportAll}

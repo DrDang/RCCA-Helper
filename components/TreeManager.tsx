@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { SavedTree, NodeStatus } from '../types';
+import { SavedTree } from '../types';
 import { STATUS_COLORS } from '../constants';
-import { ChevronDown, Plus, Upload, Download, Trash2, Pencil, Check, X, Package, FileText, FileStack } from 'lucide-react';
+import { ChevronDown, Plus, Upload, Download, Trash2, Pencil, Check, X, Package, FileText, FileStack, CheckCircle2, Circle, Eye, EyeOff } from 'lucide-react';
 
 interface TreeManagerProps {
   trees: SavedTree[];
@@ -10,6 +10,7 @@ interface TreeManagerProps {
   onCreateTree: () => void;
   onDeleteTree: (id: string) => void;
   onRenameTree: (id: string, newName: string) => void;
+  onToggleResolved: (id: string) => void;
   onFileSelected: (file: File) => void;
   onExportTree: (id: string) => void;
   onExportAll: () => void;
@@ -24,6 +25,7 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
   onCreateTree,
   onDeleteTree,
   onRenameTree,
+  onToggleResolved,
   onFileSelected,
   onExportTree,
   onExportAll,
@@ -33,6 +35,7 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [hideResolved, setHideResolved] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeTree = trees.find(t => t.id === activeTreeId);
@@ -98,12 +101,25 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
             {/* Header */}
             <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--color-border-primary)' }}>
               <span className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Investigations</span>
-              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{trees.length} total</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                  {trees.filter(t => !t.isResolved).length} active
+                  {trees.filter(t => t.isResolved).length > 0 && `, ${trees.filter(t => t.isResolved).length} resolved`}
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setHideResolved(!hideResolved); }}
+                  className="p-1 rounded transition-colors"
+                  style={{ color: hideResolved ? 'var(--color-text-muted)' : 'var(--color-brand-primary)' }}
+                  title={hideResolved ? 'Show resolved investigations' : 'Hide resolved investigations'}
+                >
+                  {hideResolved ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
             </div>
 
             {/* Tree list */}
             <div className="max-h-64 overflow-y-auto">
-              {trees.map(tree => (
+              {trees.filter(t => !hideResolved || !t.isResolved).map(tree => (
                 <div
                   key={tree.id}
                   className={`px-4 py-2.5 flex items-center gap-2 cursor-pointer border-l-3 transition-colors ${
@@ -161,7 +177,14 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
                       </div>
                     ) : (
                       <>
-                        <div className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{tree.name}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-medium truncate" style={{ color: tree.isResolved ? 'var(--color-text-muted)' : 'var(--color-text-primary)' }}>{tree.name}</span>
+                          {tree.isResolved && (
+                            <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                              Resolved
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{formatDate(tree.updatedAt)}</div>
                       </>
                     )}
@@ -169,6 +192,13 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
 
                   {renamingId !== tree.id && (
                     <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        onClick={e => { e.stopPropagation(); onToggleResolved(tree.id); }}
+                        className={`p-1 rounded transition-colors ${tree.isResolved ? 'text-green-600 hover:text-green-700' : 'text-slate-400 hover:text-green-600'}`}
+                        title={tree.isResolved ? 'Mark as active' : 'Mark as resolved'}
+                      >
+                        {tree.isResolved ? <CheckCircle2 size={13} /> : <Circle size={13} />}
+                      </button>
                       <button
                         onClick={e => { e.stopPropagation(); handleStartRename(tree); }}
                         className="p-1 rounded"
