@@ -22,13 +22,13 @@ import {
 } from 'lucide-react';
 
 const RESOLUTION_STATUSES: ResolutionStatus[] = [
-  'Draft', 'Approved', 'In Progress', 'Implemented', 'Verified', 'Closed'
+  'Open', 'In Progress', 'On Hold', 'Implemented', 'Verified', 'Closed'
 ];
 
 const RESOLUTION_STATUS_ORDER: Record<string, number> = {
   'In Progress': 0,
-  'Approved': 1,
-  'Draft': 2,
+  'Open': 1,
+  'On Hold': 2,
   'Implemented': 3,
   'Verified': 4,
   'Closed': 5,
@@ -136,7 +136,7 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
     verificationMethod: '',
     verificationResults: '',
     verifiedDate: '',
-    status: 'Draft',
+    status: 'Open',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });
@@ -147,7 +147,7 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
   };
 
   const renderResolutionCard = (resolution: ResolutionItem) => {
-    const colors = RESOLUTION_STATUS_COLORS[resolution.status] ?? RESOLUTION_STATUS_COLORS['Draft'];
+    const colors = RESOLUTION_STATUS_COLORS[resolution.status] ?? RESOLUTION_STATUS_COLORS['Open'];
     const isExpanded = expandedResolutionId === resolution.id;
     const isOverdue = resolution.targetDate &&
                       new Date(resolution.targetDate) < new Date() &&
@@ -502,7 +502,7 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
           </div>
           <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-primary)' }}>
             <div className="text-2xl font-bold" style={{ color: statusCounts['In Progress'] > 0 ? 'var(--color-resolution-progress-text)' : 'var(--color-text-primary)' }}>
-              {statusCounts['In Progress'] + statusCounts['Approved'] + statusCounts['Draft']}
+              {statusCounts['In Progress'] + statusCounts['Open'] + statusCounts['On Hold']}
             </div>
             <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Active</div>
           </div>

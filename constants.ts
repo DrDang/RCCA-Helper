@@ -53,20 +53,20 @@ export const REPORT_STATUS_COLORS = {
 
 // Theme-aware resolution status colors (resolved via CSS custom properties)
 export const RESOLUTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  'Draft': {
-    bg: 'var(--color-resolution-draft-bg)',
-    border: 'var(--color-resolution-draft-border)',
-    text: 'var(--color-resolution-draft-text)'
-  },
-  'Approved': {
-    bg: 'var(--color-resolution-approved-bg)',
-    border: 'var(--color-resolution-approved-border)',
-    text: 'var(--color-resolution-approved-text)'
+  'Open': {
+    bg: 'var(--color-resolution-open-bg)',
+    border: 'var(--color-resolution-open-border)',
+    text: 'var(--color-resolution-open-text)'
   },
   'In Progress': {
     bg: 'var(--color-resolution-progress-bg)',
     border: 'var(--color-resolution-progress-border)',
     text: 'var(--color-resolution-progress-text)'
+  },
+  'On Hold': {
+    bg: 'var(--color-resolution-hold-bg)',
+    border: 'var(--color-resolution-hold-border)',
+    text: 'var(--color-resolution-hold-text)'
   },
   'Implemented': {
     bg: 'var(--color-resolution-implemented-bg)',
@@ -87,9 +87,9 @@ export const RESOLUTION_STATUS_COLORS: Record<string, { bg: string; border: stri
 
 // Hardcoded light-mode colors for resolution statuses in reports
 export const REPORT_RESOLUTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  'Draft': { bg: '#f8fafc', border: '#94a3b8', text: '#475569' },
-  'Approved': { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af' },
+  'Open': { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af' },
   'In Progress': { bg: '#fefce8', border: '#eab308', text: '#854d0e' },
+  'On Hold': { bg: '#f8fafc', border: '#94a3b8', text: '#475569' },
   'Implemented': { bg: '#f0fdf4', border: '#22c55e', text: '#166534' },
   'Verified': { bg: '#ecfdf5', border: '#10b981', text: '#065f46' },
   'Closed': { bg: '#f5f5f5', border: '#737373', text: '#525252' }

@@ -64,15 +64,15 @@
   --color-action-closed-text: #475569;
 
   /* Resolution statuses */
-  --color-resolution-draft-bg: #f8fafc;
-  --color-resolution-draft-border: #94a3b8;
-  --color-resolution-draft-text: #475569;
-  --color-resolution-approved-bg: #eff6ff;
-  --color-resolution-approved-border: #3b82f6;
-  --color-resolution-approved-text: #1e40af;
+  --color-resolution-open-bg: #eff6ff;
+  --color-resolution-open-border: #3b82f6;
+  --color-resolution-open-text: #1e40af;
   --color-resolution-progress-bg: #fefce8;
   --color-resolution-progress-border: #eab308;
   --color-resolution-progress-text: #854d0e;
+  --color-resolution-hold-bg: #f8fafc;
+  --color-resolution-hold-border: #94a3b8;
+  --color-resolution-hold-text: #475569;
   --color-resolution-implemented-bg: #f0fdf4;
   --color-resolution-implemented-border: #22c55e;
   --color-resolution-implemented-text: #166534;
@@ -149,15 +149,15 @@
   --color-action-closed-text: #94a3b8;
 
   /* Resolution statuses */
-  --color-resolution-draft-bg: #1e293b;
-  --color-resolution-draft-border: #64748b;
-  --color-resolution-draft-text: #94a3b8;
-  --color-resolution-approved-bg: #172554;
-  --color-resolution-approved-border: #60a5fa;
-  --color-resolution-approved-text: #bfdbfe;
+  --color-resolution-open-bg: #172554;
+  --color-resolution-open-border: #60a5fa;
+  --color-resolution-open-text: #bfdbfe;
   --color-resolution-progress-bg: #422006;
   --color-resolution-progress-border: #facc15;
   --color-resolution-progress-text: #fef08a;
+  --color-resolution-hold-bg: #1e293b;
+  --color-resolution-hold-border: #64748b;
+  --color-resolution-hold-text: #94a3b8;
   --color-resolution-implemented-bg: #052e16;
   --color-resolution-implemented-border: #4ade80;
   --color-resolution-implemented-text: #bbf7d0;

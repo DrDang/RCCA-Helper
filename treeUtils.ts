@@ -52,9 +52,9 @@ export function countActionsByStatus(actions: ActionItem[]): Record<string, numb
 
 export function countResolutionsByStatus(resolutions: ResolutionItem[]): Record<string, number> {
   const counts: Record<string, number> = {
-    'Draft': 0,
-    'Approved': 0,
+    'Open': 0,
     'In Progress': 0,
+    'On Hold': 0,
     'Implemented': 0,
     'Verified': 0,
     'Closed': 0,

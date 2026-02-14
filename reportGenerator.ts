@@ -151,7 +151,7 @@ function renderResolutionsTable(tree: SavedTree): string {
       .map(id => nodeMap.get(id)?.label ?? 'Unknown')
       .join(', ');
     const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
-    const colors = REPORT_RESOLUTION_STATUS_COLORS[r.status] ?? REPORT_RESOLUTION_STATUS_COLORS['Draft'];
+    const colors = REPORT_RESOLUTION_STATUS_COLORS[r.status] ?? REPORT_RESOLUTION_STATUS_COLORS['Open'];
 
     html += `
       <tr style="background:${rowBg}">

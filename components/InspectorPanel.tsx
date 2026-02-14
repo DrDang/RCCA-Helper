@@ -41,15 +41,15 @@ const ACTION_STATUS_ORDER: Record<string, number> = {
 // Resolution status order: active on top, terminal at bottom
 const RESOLUTION_STATUS_ORDER: Record<string, number> = {
   'In Progress': 0,
-  'Approved': 1,
-  'Draft': 2,
+  'Open': 1,
+  'On Hold': 2,
   'Implemented': 3,
   'Verified': 4,
   'Closed': 5,
 };
 
 const RESOLUTION_STATUSES: ResolutionStatus[] = [
-  'Draft', 'Approved', 'In Progress', 'Implemented', 'Verified', 'Closed'
+  'Open', 'In Progress', 'On Hold', 'Implemented', 'Verified', 'Closed'
 ];
 
 interface InspectorPanelProps {
@@ -678,13 +678,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
               verificationMethod: '',
               verificationResults: '',
               verifiedDate: '',
-              status: 'Draft',
+              status: 'Open',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             });
 
             const renderResolutionCard = (resolution: ResolutionItem, displayIndex: number) => {
-                const colors = RESOLUTION_STATUS_COLORS[resolution.status] ?? RESOLUTION_STATUS_COLORS['Draft'];
+                const colors = RESOLUTION_STATUS_COLORS[resolution.status] ?? RESOLUTION_STATUS_COLORS['Open'];
                 const isExpanded = expandedResolutionId === resolution.id;
                 const linkedCauseCount = resolution.linkedCauseIds.length;
 

@@ -66,18 +66,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         };
 
         const RESOLUTION_COLOR_MAP: Record<string, string> = {
-          'Draft': 'var(--color-resolution-draft-text)',
-          'Approved': 'var(--color-resolution-approved-text)',
+          'Open': 'var(--color-resolution-open-text)',
           'In Progress': 'var(--color-resolution-progress-text)',
+          'On Hold': 'var(--color-resolution-hold-text)',
           'Implemented': 'var(--color-resolution-implemented-text)',
           'Verified': 'var(--color-resolution-verified-text)',
           'Closed': 'var(--color-resolution-closed-text)',
         };
 
         const RESOLUTION_BORDER_MAP: Record<string, string> = {
-          'Draft': 'var(--color-resolution-draft-border)',
-          'Approved': 'var(--color-resolution-approved-border)',
+          'Open': 'var(--color-resolution-open-border)',
           'In Progress': 'var(--color-resolution-progress-border)',
+          'On Hold': 'var(--color-resolution-hold-border)',
           'Implemented': 'var(--color-resolution-implemented-border)',
           'Verified': 'var(--color-resolution-verified-border)',
           'Closed': 'var(--color-resolution-closed-border)',

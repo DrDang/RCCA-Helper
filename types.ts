@@ -51,9 +51,9 @@ export interface Note {
 }
 
 export type ResolutionStatus =
-  | 'Draft'        // Being defined
-  | 'Approved'     // Ready for implementation
+  | 'Open'         // Newly created, ready to work
   | 'In Progress'  // Implementation underway
+  | 'On Hold'      // Temporarily paused
   | 'Implemented'  // Awaiting verification
   | 'Verified'     // Effectiveness confirmed
   | 'Closed';      // Complete
