@@ -260,7 +260,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                     <h3 className="font-bold text-sm leading-tight" style={{ wordBreak: 'break-word' }}>
                       {node.data.label}
                     </h3>
-                    <p className="text-xs opacity-80 mt-1 line-clamp-2">
+                    <p className="text-xs opacity-80 mt-1 line-clamp-3">
                       {node.data.description || 'No description provided.'}
                     </p>
                   </div>

@@ -117,9 +117,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   onWidthChange
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'rail' | 'notes' | 'resolutions'>('details');
-  const [expandedResolutionId, setExpandedResolutionId] = useState<string | null>(null);
-  const [expandedActionUpdates, setExpandedActionUpdates] = useState<Record<string, boolean>>({});
-  const [expandedResolutionUpdates, setExpandedResolutionUpdates] = useState<Record<string, boolean>>({});
+  const [collapsedResolutionIds, setCollapsedResolutionIds] = useState<Record<string, boolean>>({});
+  const [collapsedActionUpdates, setCollapsedActionUpdates] = useState<Record<string, boolean>>({});
+  const [collapsedResolutionUpdates, setCollapsedResolutionUpdates] = useState<Record<string, boolean>>({});
+  const [expandedResolutionCauses, setExpandedResolutionCauses] = useState<Record<string, boolean>>({});
   const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
   const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null);
   const [editingUpdateText, setEditingUpdateText] = useState('');
@@ -468,18 +469,18 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         {/* Updates / Activity Log */}
                         <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
                             <button
-                                onClick={() => setExpandedActionUpdates(prev => ({ ...prev, [action.id]: !prev[action.id] }))}
+                                onClick={() => setCollapsedActionUpdates(prev => ({ ...prev, [action.id]: !prev[action.id] }))}
                                 className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold w-full"
                                 style={{ color: 'var(--color-text-muted)' }}
                             >
                                 <ChevronRight
                                     size={12}
-                                    className={`transition-transform ${expandedActionUpdates[action.id] ? 'rotate-90' : ''}`}
+                                    className={`transition-transform ${!collapsedActionUpdates[action.id] ? 'rotate-90' : ''}`}
                                 />
                                 Updates ({(action.updates ?? []).length})
                             </button>
 
-                            {expandedActionUpdates[action.id] && (
+                            {!collapsedActionUpdates[action.id] && (
                                 <div className="mt-2 space-y-2">
                                     {/* Add new update */}
                                     <div className="flex gap-1">
@@ -760,7 +761,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
             const renderResolutionCard = (resolution: ResolutionItem, displayIndex: number) => {
                 const colors = RESOLUTION_STATUS_COLORS[resolution.status] ?? RESOLUTION_STATUS_COLORS['Open'];
-                const isExpanded = expandedResolutionId === resolution.id;
+                const isExpanded = !collapsedResolutionIds[resolution.id];
                 const linkedCauseCount = resolution.linkedCauseIds.length;
 
                 return (
@@ -790,7 +791,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                     #R{displayIndex}
                                 </span>
                                 <button
-                                    onClick={() => setExpandedResolutionId(isExpanded ? null : resolution.id)}
+                                    onClick={() => setCollapsedResolutionIds(prev => ({ ...prev, [resolution.id]: !prev[resolution.id] }))}
                                     className="p-1 rounded hover:bg-black/10"
                                     style={{ color: 'var(--color-text-muted)' }}
                                     title={isExpanded ? 'Collapse' : 'Expand'}
@@ -921,46 +922,58 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                 {/* Link to other root causes */}
                                 {allRootCauses.length > 1 && (
                                     <div>
-                                        <label className="text-[10px] uppercase font-semibold" style={{ color: 'var(--color-text-muted)' }}>Link to Root Causes</label>
-                                        <div className="mt-1 space-y-1">
-                                            {allRootCauses.map(rc => (
-                                                <label key={rc.id} className="flex items-center gap-2 text-xs cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={resolution.linkedCauseIds.includes(rc.id)}
-                                                        onChange={(e) => {
-                                                            const newLinked = e.target.checked
-                                                                ? [...resolution.linkedCauseIds, rc.id]
-                                                                : resolution.linkedCauseIds.filter(id => id !== rc.id);
-                                                            if (newLinked.length > 0) {
-                                                                onUpdateResolution({...resolution, linkedCauseIds: newLinked});
-                                                            }
-                                                        }}
-                                                        className="rounded"
-                                                        disabled={resolution.linkedCauseIds.length === 1 && resolution.linkedCauseIds[0] === rc.id}
-                                                    />
-                                                    <span style={{ color: 'var(--color-text-secondary)' }}>{rc.label}</span>
-                                                </label>
-                                            ))}
-                                        </div>
+                                        <button
+                                            onClick={() => setExpandedResolutionCauses(prev => ({ ...prev, [resolution.id]: !prev[resolution.id] }))}
+                                            className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold w-full"
+                                            style={{ color: 'var(--color-text-muted)' }}
+                                        >
+                                            <ChevronRight
+                                                size={12}
+                                                className={`transition-transform ${expandedResolutionCauses[resolution.id] ? 'rotate-90' : ''}`}
+                                            />
+                                            Link to Root Causes ({resolution.linkedCauseIds.length})
+                                        </button>
+                                        {expandedResolutionCauses[resolution.id] && (
+                                            <div className="mt-1 space-y-1 ml-4">
+                                                {allRootCauses.map(rc => (
+                                                    <label key={rc.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={resolution.linkedCauseIds.includes(rc.id)}
+                                                            onChange={(e) => {
+                                                                const newLinked = e.target.checked
+                                                                    ? [...resolution.linkedCauseIds, rc.id]
+                                                                    : resolution.linkedCauseIds.filter(id => id !== rc.id);
+                                                                if (newLinked.length > 0) {
+                                                                    onUpdateResolution({...resolution, linkedCauseIds: newLinked});
+                                                                }
+                                                            }}
+                                                            className="rounded"
+                                                            disabled={resolution.linkedCauseIds.length === 1 && resolution.linkedCauseIds[0] === rc.id}
+                                                        />
+                                                        <span style={{ color: 'var(--color-text-secondary)' }}>{rc.label}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
                                 {/* Updates / Activity Log */}
                                 <div className="pt-2" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
                                     <button
-                                        onClick={() => setExpandedResolutionUpdates(prev => ({ ...prev, [resolution.id]: !prev[resolution.id] }))}
+                                        onClick={() => setCollapsedResolutionUpdates(prev => ({ ...prev, [resolution.id]: !prev[resolution.id] }))}
                                         className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold w-full"
                                         style={{ color: 'var(--color-text-muted)' }}
                                     >
                                         <ChevronRight
                                             size={12}
-                                            className={`transition-transform ${expandedResolutionUpdates[resolution.id] ? 'rotate-90' : ''}`}
+                                            className={`transition-transform ${!collapsedResolutionUpdates[resolution.id] ? 'rotate-90' : ''}`}
                                         />
                                         Updates ({(resolution.updates ?? []).length})
                                     </button>
 
-                                    {expandedResolutionUpdates[resolution.id] && (
+                                    {!collapsedResolutionUpdates[resolution.id] && (
                                         <div className="mt-2 space-y-2">
                                             <div className="flex gap-1">
                                                 <input

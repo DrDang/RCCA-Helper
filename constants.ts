@@ -1,7 +1,7 @@
 import { CauseNode, NodeStatus, NodeType } from './types';
 
 export const CARD_WIDTH = 240;
-export const CARD_HEIGHT = 120;
+export const CARD_HEIGHT = 150;
 
 // Theme-aware status colors (resolved via CSS custom properties)
 export const STATUS_COLORS = {
