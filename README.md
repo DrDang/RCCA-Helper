@@ -102,6 +102,10 @@ If you change the source code, run `npm run build` again so the checked-in `dist
 - Production output is static and can be hosted on GitHub Pages, Netlify, Vercel, S3, Nginx, Apache, or any similar static host.
 - No backend service is required for the core experience in this repository.
 
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, launcher notes, and expectations around keeping `dist/` in sync with source changes.
+
 ## Project Structure
 
 ```text
@@ -134,10 +138,9 @@ If you change the source code, run `npm run build` again so the checked-in `dist
 These are not required for the app to work, but they would make the repository feel even more complete:
 
 - add a real animated GIF walkthrough captured from the running app
-- add a `CONTRIBUTING.md` with local dev and release notes
 - add a GitHub Pages deployment workflow if you want a live demo URL
 - add sample investigation JSON fixtures for demoing imports
-- add a small release note reminding maintainers to rebuild `dist/` after source changes
+- add a small release notes template for tagged versions
 
 ## License
 
