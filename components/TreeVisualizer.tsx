@@ -201,6 +201,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             const isSelected = node.data.id === selectedId;
             const hasActions = nodesWithActions.has(node.data.id);
             const hasResolutions = nodesWithResolutions.has(node.data.id);
+            const isLeafRootCause = node.data.isRootCause === true && (!node.data.children || node.data.children.length === 0);
 
             return (
               <foreignObject
@@ -223,9 +224,9 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                   `}
                   style={{
                     backgroundColor: styles.bg,
-                    borderColor: isSelected ? '#6366f1' : (node.data.isRootCause ? '#f59e0b' : styles.border),
+                    borderColor: isSelected ? '#6366f1' : (isLeafRootCause ? '#f59e0b' : styles.border),
                     color: styles.text,
-                    boxShadow: node.data.isRootCause ? '0 0 0 2px rgba(245,158,11,0.3)' : undefined,
+                    boxShadow: isLeafRootCause ? '0 0 0 2px rgba(245,158,11,0.3)' : undefined,
                   }}
                 >
                   {/* Status Indicator Dot */}
@@ -308,7 +309,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                   </div>
 
                   {/* Root Cause badge */}
-                  {node.data.isRootCause && (
+                  {isLeafRootCause && (
                     <div
                       className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-amber-500 border border-white shadow-sm"
                       title="Root Cause"

@@ -80,7 +80,7 @@ export function getTreeStats(tree: SavedTree): TreeStats {
     totalNotes: tree.notes.length,
     totalEvidence: tree.notes.filter(n => n.isEvidence).length,
     confirmedCauses: causeNodes.filter(n => n.status === NodeStatus.CONFIRMED),
-    rootCauses: causeNodes.filter(n => n.isRootCause === true),
+    rootCauses: causeNodes.filter(n => n.isRootCause === true && (!n.children || n.children.length === 0)),
     resolutionsByStatus: countResolutionsByStatus(resolutions),
     totalResolutions: resolutions.length,
   };

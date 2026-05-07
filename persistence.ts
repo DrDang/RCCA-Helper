@@ -6,6 +6,37 @@ const DEFAULT_PROJECT_ID = 'default-project';
 const SETTINGS_KEY = 'rcca-helper-settings';
 const LAST_EXPORT_KEY = 'rcca-helper-last-export';
 
+interface FileSystemWritableFileStreamLike {
+  write(data: Blob): Promise<void>;
+  close(): Promise<void>;
+}
+
+export interface FileSystemFileHandleLike {
+  createWritable(): Promise<FileSystemWritableFileStreamLike>;
+  getFile?: () => Promise<File>;
+}
+
+interface SaveFilePickerOptionsLike {
+  suggestedName?: string;
+  types?: Array<{
+    description: string;
+    accept: Record<string, string[]>;
+  }>;
+}
+
+interface OpenFilePickerOptionsLike {
+  multiple?: boolean;
+  types?: Array<{
+    description: string;
+    accept: Record<string, string[]>;
+  }>;
+}
+
+interface WindowWithFilePickers extends Window {
+  showSaveFilePicker?: (options?: SaveFilePickerOptionsLike) => Promise<FileSystemFileHandleLike>;
+  showOpenFilePicker?: (options?: OpenFilePickerOptionsLike) => Promise<FileSystemFileHandleLike[]>;
+}
+
 export const DEFAULT_SETTINGS: AppSettings = {
   autoBackupEnabled: false,
   autoBackupIntervalMinutes: 15,
@@ -35,6 +66,82 @@ export function setLastExportTimestamp(): void {
   localStorage.setItem(LAST_EXPORT_KEY, new Date().toISOString());
 }
 
+function makeJsonBlob(data: unknown): Blob {
+  return new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function safeFileName(name: string): string {
+  return name.replace(/[^a-z0-9]/gi, '_');
+}
+
+export function createProjectExportData(project: Project, trees: SavedTreeV2[]): ProjectImportData {
+  return {
+    type: 'rcca-project',
+    project,
+    trees: trees.filter(t => t.projectId === project.id),
+  };
+}
+
+export function getProjectFileName(project: Project): string {
+  return `${safeFileName(project.name)}_Project.json`;
+}
+
+export function isDirectFileSaveSupported(): boolean {
+  return typeof (window as WindowWithFilePickers).showSaveFilePicker === 'function';
+}
+
+export async function chooseJsonSaveFile(suggestedName: string): Promise<FileSystemFileHandleLike | null> {
+  const picker = (window as WindowWithFilePickers).showSaveFilePicker;
+  if (!picker) return null;
+
+  return picker({
+    suggestedName,
+    types: [
+      {
+        description: 'RCCA JSON Project',
+        accept: { 'application/json': ['.json'] },
+      },
+    ],
+  });
+}
+
+export async function chooseJsonOpenFile(): Promise<{ file: File; handle: FileSystemFileHandleLike } | null> {
+  const picker = (window as WindowWithFilePickers).showOpenFilePicker;
+  if (!picker) return null;
+
+  const [handle] = await picker({
+    multiple: false,
+    types: [
+      {
+        description: 'RCCA JSON Project',
+        accept: { 'application/json': ['.json'] },
+      },
+    ],
+  });
+
+  if (!handle?.getFile) return null;
+  return { file: await handle.getFile(), handle };
+}
+
+export async function writeJsonToFile(handle: FileSystemFileHandleLike, data: unknown): Promise<void> {
+  const writable = await handle.createWritable();
+  await writable.write(makeJsonBlob(data));
+  await writable.close();
+}
+
+export function downloadJson(data: unknown, fileName: string): void {
+  downloadBlob(makeJsonBlob(data), fileName);
+}
+
 function migrateNode(node: CauseNode, isRoot: boolean = false): CauseNode {
   const migratedChildren = node.children?.map(child => migrateNode(child, false));
 
@@ -51,6 +158,7 @@ function migrateNode(node: CauseNode, isRoot: boolean = false): CauseNode {
   return {
     ...node,
     status: isNodeStatus(node.status) ? node.status : NodeStatus.PENDING,
+    isRootCause: migratedChildren && migratedChildren.length > 0 ? false : node.isRootCause,
     children: migratedChildren,
   };
 }
@@ -139,19 +247,7 @@ export function createDefaultProject(): Project {
 }
 
 export function exportProjectAsJson(project: Project, trees: SavedTreeV2[]): void {
-  const projectTrees = trees.filter(t => t.projectId === project.id);
-  const exportData = {
-    type: 'rcca-project',
-    project,
-    trees: projectTrees
-  };
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${project.name.replace(/[^a-z0-9]/gi, '_')}_Project_${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadJson(createProjectExportData(project, trees), getProjectFileName(project));
 }
 
 export interface ProjectImportData {
@@ -206,13 +302,7 @@ export function parseProjectImportFile(file: File): Promise<ProjectImportData | 
 }
 
 export function exportAllTreesAsJson(trees: SavedTree[]): void {
-  const blob = new Blob([JSON.stringify(trees, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `RCCA_All_Investigations_${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadJson(trees, `RCCA_All_Investigations_${new Date().toISOString().split('T')[0]}.json`);
 }
 
 export function importAllTreesFromJson(file: File): Promise<SavedTree[]> {
@@ -243,13 +333,7 @@ export function importAllTreesFromJson(file: File): Promise<SavedTree[]> {
 }
 
 export function exportTreeAsJson(tree: SavedTree): void {
-  const blob = new Blob([JSON.stringify(tree, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${tree.name.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadJson(tree, `${safeFileName(tree.name)}_${new Date().toISOString().split('T')[0]}.json`);
 }
 
 export function parseImportFile(file: File): Promise<SavedTree[]> {

@@ -18,6 +18,7 @@ function renderTreeHierarchy(node: CauseNode, notes: { referenceId: string; cont
   const colors = getReportNodeStatusColors(node);
   const indent = depth * 24;
   const nodeNotes = notes.filter(n => n.referenceId === node.id);
+  const isLeafRootCause = node.isRootCause === true && (!node.children || node.children.length === 0);
 
   let html = `
     <div style="margin-left:${indent}px;margin-bottom:12px;padding:10px 14px;border-left:3px solid ${colors.border};background:${colors.bg};border-radius:0 6px 6px 0">
@@ -26,7 +27,7 @@ function renderTreeHierarchy(node: CauseNode, notes: { referenceId: string; cont
         <strong style="color:${colors.text}">${escapeHtml(node.label)}</strong>
         <span style="font-size:11px;color:#64748b;text-transform:uppercase">${escapeHtml(node.type)}</span>
         ${statusBadge(getNodeStatusLabel(node), colors)}
-        ${node.isRootCause ? '<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#f59e0b;color:#fff;margin-left:4px">ROOT CAUSE</span>' : ''}
+        ${isLeafRootCause ? '<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#f59e0b;color:#fff;margin-left:4px">ROOT CAUSE</span>' : ''}
       </div>`;
 
   if (node.description) {
@@ -220,8 +221,8 @@ function renderInvestigation(tree: SavedTree, headingTag: 'h1' | 'h2' = 'h1', an
   html += renderStatGrid('Actions by Status', stats.actionsByStatus, actionColorMap);
 
   // Identified Root Causes (explicitly marked)
-  const explicitRootCauses = stats.confirmedCauses.filter(n => n.isRootCause);
-  const otherConfirmed = stats.confirmedCauses.filter(n => !n.isRootCause);
+  const explicitRootCauses = stats.rootCauses;
+  const otherConfirmed = stats.confirmedCauses.filter(n => !stats.rootCauses.some(rc => rc.id === n.id));
 
   if (explicitRootCauses.length > 0) {
     html += `<div style="margin-bottom:16px;padding:12px;background:#fffbeb;border:2px solid #f59e0b;border-radius:8px">

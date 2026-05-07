@@ -8,11 +8,11 @@ import { ResolutionsSummary } from './components/ResolutionsSummary';
 import { InvestigationActionsSummary } from './components/InvestigationActionsSummary';
 import { CauseNode, ActionItem, Note, IssueStatus, NodeStatus, NodeType, SavedTree, SavedTreeV2, AppSettings, ResolutionItem, Project } from './types';
 import { createInitialTree } from './constants';
-import { loadAppState, saveAppState, exportTreeAsJson, exportAllTreesAsJson, parseImportFile, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS, createDefaultProject, exportProjectAsJson, parseProjectImportFile, ProjectImportData } from './persistence';
+import { chooseJsonOpenFile, chooseJsonSaveFile, createProjectExportData, downloadJson, FileSystemFileHandleLike, getProjectFileName, isDirectFileSaveSupported, saveAppState, exportTreeAsJson, exportAllTreesAsJson, parseImportFile, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS, exportProjectAsJson, parseProjectImportFile, ProjectImportData, writeJsonToFile } from './persistence';
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
 import { SettingsModal } from './components/SettingsModal';
 import { ImportDialog } from './components/ImportDialog';
-import { GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun, Shield, ClipboardList, PanelRightOpen } from 'lucide-react';
+import { FolderOpen, GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun, Shield, ClipboardList, PanelRightOpen, Save } from 'lucide-react';
 
 const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -29,36 +29,17 @@ const App: React.FC = () => {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [inspectorWidth, setInspectorWidth] = useState(450);
   const [importCandidates, setImportCandidates] = useState<SavedTree[] | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [pendingNavigation, setPendingNavigation] = useState<null | (() => void)>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
+  const [isOpeningFile, setIsOpeningFile] = useState(false);
+  const startupFileInputRef = useRef<HTMLInputElement>(null);
+  const suppressUnsavedRef = useRef(false);
+  const projectSaveHandleRef = useRef<{ projectId: string; handle: FileSystemFileHandleLike } | null>(null);
 
-  // Load from localStorage on mount
+  // Load preferences on mount. Project data must be opened from a JSON file each session.
   useEffect(() => {
-    const saved = loadAppState();
-    if (saved && saved.projects.length > 0) {
-      setProjects(saved.projects);
-      setTrees(saved.trees);
-      setActiveProjectId(saved.activeProjectId ?? saved.projects[0].id);
-      setActiveTreeId(saved.activeTreeId);
-    } else {
-      // First time: create default project with one investigation
-      const defaultProject = createDefaultProject();
-      const defaultTree: SavedTreeV2 = {
-        id: crypto.randomUUID(),
-        projectId: defaultProject.id,
-        name: 'New Investigation',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        treeData: createInitialTree(),
-        actions: [],
-        notes: [],
-        resolutions: []
-      };
-      setProjects([defaultProject]);
-      setTrees([defaultTree]);
-      setActiveProjectId(defaultProject.id);
-      setActiveTreeId(defaultTree.id);
-    }
-    const savedSettings = loadSettings();
-    setSettings(savedSettings);
+    setSettings(loadSettings());
     setLastExportTs(getLastExportTimestamp());
     setInitialized(true);
   }, []);
@@ -76,33 +57,62 @@ const App: React.FC = () => {
   // Track unsaved changes
   useEffect(() => {
     if (!initialized) return;
+    if (projects.length === 0) return;
+    if (suppressUnsavedRef.current) {
+      suppressUnsavedRef.current = false;
+      return;
+    }
     setHasUnsavedChanges(true);
-  }, [trees]);
+  }, [trees, projects]);
 
-  // Auto-backup interval
+  // Auto-save interval: write to the active project's saved file when available, otherwise fall back to backup download.
   useEffect(() => {
     if (!settings.autoBackupEnabled || !initialized || trees.length === 0) return;
     const intervalMs = settings.autoBackupIntervalMinutes * 60 * 1000;
     const timer = setInterval(() => {
-      if (hasUnsavedChanges) {
-        const prefix = settings.projectFileName || 'RCCA_Backup';
-        const blob = new Blob([JSON.stringify(trees, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${prefix.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}_${Date.now()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        setLastExportTimestamp();
-        setLastExportTs(new Date().toISOString());
-        setHasUnsavedChanges(false);
-      }
+      if (!hasUnsavedChanges) return;
+
+      void (async () => {
+        const saveHandle = projectSaveHandleRef.current?.projectId === activeProjectId
+          ? projectSaveHandleRef.current.handle
+          : null;
+        const project = projects.find(p => p.id === activeProjectId);
+
+        try {
+          if (saveHandle && project) {
+            await writeJsonToFile(saveHandle, createProjectExportData(project, trees));
+          } else {
+            const prefix = settings.projectFileName || 'RCCA_Backup';
+            downloadJson(trees, `${prefix.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}_${Date.now()}.json`);
+          }
+
+          saveAppState({ version: 2, activeProjectId, activeTreeId, projects, trees });
+          setLastExportTimestamp();
+          setLastExportTs(new Date().toISOString());
+          setHasUnsavedChanges(false);
+        } catch (err) {
+          console.warn('Auto-save failed; falling back to backup download.', err);
+          const prefix = settings.projectFileName || 'RCCA_Backup';
+          downloadJson(trees, `${prefix.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}_${Date.now()}.json`);
+          setLastExportTimestamp();
+          setLastExportTs(new Date().toISOString());
+          setHasUnsavedChanges(false);
+        }
+      })();
     }, intervalMs);
     return () => clearInterval(timer);
-  }, [settings.autoBackupEnabled, settings.autoBackupIntervalMinutes, settings.projectFileName, initialized, trees, hasUnsavedChanges]);
+  }, [settings.autoBackupEnabled, settings.autoBackupIntervalMinutes, settings.projectFileName, initialized, projects, trees, activeProjectId, activeTreeId, hasUnsavedChanges]);
 
-  // Note: No beforeunload warning needed since data is auto-saved to localStorage.
-  // Users can export to JSON files for sharing or backup purposes.
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Debounced auto-save to localStorage
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -139,7 +149,193 @@ const App: React.FC = () => {
     return result;
   };
   const allNodes = treeData ? flattenTree(treeData) : [];
-  const allRootCauses = allNodes.filter(n => n.isRootCause === true);
+  const allRootCauses = allNodes.filter(n => n.isRootCause === true && (!n.children || n.children.length === 0));
+
+  const getTreeActivityScore = (tree: SavedTreeV2): number => {
+    const countNodes = (node: CauseNode): number =>
+      1 + (node.children?.reduce((total, child) => total + countNodes(child), 0) ?? 0);
+
+    const rootHasSpecificLabel = tree.treeData.label.trim() !== '' && tree.treeData.label !== 'New Issue';
+    return countNodes(tree.treeData)
+      + tree.actions.length * 3
+      + tree.notes.length * 2
+      + (tree.resolutions ?? []).length * 3
+      + (rootHasSpecificLabel ? 5 : 0);
+  };
+
+  const getInitialTreeId = (candidateTrees: SavedTreeV2[]): string | null => {
+    if (candidateTrees.length === 0) return null;
+
+    return [...candidateTrees].sort((a, b) => {
+      const scoreDelta = getTreeActivityScore(b) - getTreeActivityScore(a);
+      if (scoreDelta !== 0) return scoreDelta;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    })[0].id;
+  };
+
+  const handleSaveProject = useCallback(async () => {
+    if (!activeProject) return;
+
+    const exportData = createProjectExportData(activeProject, trees);
+    const fileName = getProjectFileName(activeProject);
+    setSaveStatus('saving');
+
+    try {
+      let saveHandle = projectSaveHandleRef.current?.projectId === activeProject.id
+        ? projectSaveHandleRef.current.handle
+        : null;
+
+      if (!saveHandle && isDirectFileSaveSupported()) {
+        saveHandle = await chooseJsonSaveFile(fileName);
+        if (saveHandle) {
+          projectSaveHandleRef.current = { projectId: activeProject.id, handle: saveHandle };
+        }
+      }
+
+      if (saveHandle) {
+        await writeJsonToFile(saveHandle, exportData);
+      } else {
+        downloadJson(exportData, fileName);
+      }
+
+      saveAppState({ version: 2, activeProjectId, activeTreeId, projects, trees });
+      setLastExportTimestamp();
+      setLastExportTs(new Date().toISOString());
+      setHasUnsavedChanges(false);
+      setSaveStatus('saved');
+      window.setTimeout(() => setSaveStatus('idle'), 1800);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setSaveStatus('idle');
+        return;
+      }
+      console.error(err);
+      alert('Save failed. Please try Export from the project menu.');
+      setSaveStatus('idle');
+    }
+  }, [activeProject, activeProjectId, activeTreeId, projects, trees]);
+
+  const loadWorkspaceFromJsonFile = useCallback(async (file: File, handle: FileSystemFileHandleLike | null = null) => {
+    setOpenError(null);
+
+    const result = await parseProjectImportFile(file);
+    const now = new Date().toISOString();
+
+    let openedProject: Project;
+    let openedTrees: SavedTreeV2[];
+
+    if ('type' in result && result.type === 'rcca-project') {
+      const importData = result as ProjectImportData;
+      openedProject = {
+        ...importData.project,
+        id: importData.project.id || crypto.randomUUID(),
+        updatedAt: importData.project.updatedAt || now,
+      };
+      openedTrees = importData.trees.map(tree => ({
+        ...tree,
+        projectId: openedProject.id,
+      }));
+    } else {
+      const importedTrees = result as SavedTree[];
+      const projectName = file.name.replace(/\.json$/i, '').replace(/[_-]+/g, ' ').trim() || 'Imported Project';
+      openedProject = {
+        id: crypto.randomUUID(),
+        name: projectName,
+        createdAt: now,
+        updatedAt: now,
+      };
+      openedTrees = importedTrees.map(tree => ({
+        ...tree,
+        projectId: openedProject.id,
+      })) as SavedTreeV2[];
+    }
+
+    const initialTreeId = getInitialTreeId(openedTrees);
+
+    suppressUnsavedRef.current = true;
+    setProjects([openedProject]);
+    setTrees(openedTrees);
+    setActiveProjectId(openedProject.id);
+    setActiveTreeId(initialTreeId);
+    setSelectedNodeId(null);
+    setCurrentView('tree');
+    projectSaveHandleRef.current = handle ? { projectId: openedProject.id, handle } : null;
+    saveAppState({
+      version: 2,
+      activeProjectId: openedProject.id,
+      activeTreeId: initialTreeId,
+      projects: [openedProject],
+      trees: openedTrees,
+    });
+    setHasUnsavedChanges(false);
+  }, []);
+
+  const handleOpenJsonFile = useCallback(async () => {
+    setOpenError(null);
+    setIsOpeningFile(true);
+
+    try {
+      const opened = await chooseJsonOpenFile();
+      if (opened) {
+        await loadWorkspaceFromJsonFile(opened.file, opened.handle);
+      } else {
+        startupFileInputRef.current?.click();
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      setOpenError(err instanceof Error ? err.message : 'Failed to open JSON file');
+    } finally {
+      setIsOpeningFile(false);
+    }
+  }, [loadWorkspaceFromJsonFile]);
+
+  const handleStartupFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setOpenError(null);
+    setIsOpeningFile(true);
+    try {
+      await loadWorkspaceFromJsonFile(file);
+    } catch (err) {
+      setOpenError(err instanceof Error ? err.message : 'Failed to open JSON file');
+    } finally {
+      setIsOpeningFile(false);
+    }
+  };
+
+  const guardedNavigate = useCallback((action: () => void) => {
+    if (!hasUnsavedChanges) {
+      action();
+      return;
+    }
+    setPendingNavigation(() => action);
+  }, [hasUnsavedChanges]);
+
+  const handleSaveAndContinue = async () => {
+    await handleSaveProject();
+    pendingNavigation?.();
+    setPendingNavigation(null);
+  };
+
+  const handleLeaveWithoutSaving = () => {
+    pendingNavigation?.();
+    setHasUnsavedChanges(false);
+    setPendingNavigation(null);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        void handleSaveProject();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSaveProject]);
 
   // Helper to update the active tree within the trees array
   const updateActiveTree = useCallback((updater: (tree: SavedTree) => SavedTree) => {
@@ -252,11 +448,15 @@ const App: React.FC = () => {
   };
 
   const handleUpdateNode = (updatedNode: CauseNode) => {
+    const normalizedNode = updatedNode.isRootCause && updatedNode.children && updatedNode.children.length > 0
+      ? { ...updatedNode, isRootCause: false }
+      : updatedNode;
+
     updateActiveTree(tree => ({
       ...tree,
-      treeData: updateTree(tree.treeData, updatedNode),
-      isResolved: updatedNode.id === tree.treeData.id
-        ? updatedNode.status === IssueStatus.RESOLVED || updatedNode.status === IssueStatus.CLOSED
+      treeData: updateTree(tree.treeData, normalizedNode),
+      isResolved: normalizedNode.id === tree.treeData.id
+        ? normalizedNode.status === IssueStatus.RESOLVED || normalizedNode.status === IssueStatus.CLOSED
         : tree.isResolved,
     }));
   };
@@ -363,12 +563,14 @@ const App: React.FC = () => {
   };
 
   const handleSelectProject = (id: string) => {
-    setActiveProjectId(id);
-    // Select first tree in new project, if any
-    const projectTreeList = trees.filter(t => t.projectId === id);
-    setActiveTreeId(projectTreeList[0]?.id ?? null);
-    setSelectedNodeId(null);
-    setCurrentView('tree');
+    guardedNavigate(() => {
+      setActiveProjectId(id);
+      // Select first tree in new project, if any
+      const projectTreeList = trees.filter(t => t.projectId === id);
+      setActiveTreeId(projectTreeList[0]?.id ?? null);
+      setSelectedNodeId(null);
+      setCurrentView('tree');
+    });
   };
 
   const handleExportProject = (id: string) => {
@@ -579,9 +781,11 @@ const App: React.FC = () => {
   };
 
   const handleDashboardSelectTree = (id: string) => {
-    setActiveTreeId(id);
-    setSelectedNodeId(null);
-    setCurrentView('tree');
+    guardedNavigate(() => {
+      setActiveTreeId(id);
+      setSelectedNodeId(null);
+      setCurrentView('tree');
+    });
   };
 
   const handleNavigateToNode = (nodeId: string) => {
@@ -591,6 +795,42 @@ const App: React.FC = () => {
   };
 
   if (!initialized) return null;
+
+  if (projects.length === 0) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center px-6" style={{ backgroundColor: 'var(--color-surface-secondary)' }}>
+        <div className="w-full max-w-xl text-center">
+          <div className="mx-auto mb-6 w-20 h-20 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg">
+            <GitBranch size={42} />
+          </div>
+          <h1 className="text-4xl font-bold mb-3" style={{ color: 'var(--color-text-primary)' }}>RCCA Helper</h1>
+          <p className="text-lg mb-8" style={{ color: 'var(--color-text-secondary)' }}>
+            Open a saved RCCA JSON file to begin.
+          </p>
+          <button
+            onClick={() => void handleOpenJsonFile()}
+            disabled={isOpeningFile}
+            className="inline-flex items-center justify-center gap-3 px-8 py-5 rounded-xl text-xl font-bold text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-wait transition-colors shadow-lg"
+          >
+            <FolderOpen size={28} />
+            {isOpeningFile ? 'Opening...' : 'Open JSON File'}
+          </button>
+          <input
+            ref={startupFileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleStartupFileChange}
+          />
+          {openError && (
+            <p className="mt-5 text-sm font-medium text-red-600">
+              {openError}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-screen h-screen flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--color-surface-secondary)' }}>
@@ -654,6 +894,16 @@ const App: React.FC = () => {
             </button>
           )}
 
+          <button
+            onClick={() => void handleSaveProject()}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50"
+            disabled={!activeProject || saveStatus === 'saving'}
+            title="Save project (Ctrl+S)"
+          >
+            <Save size={16} />
+            {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : hasUnsavedChanges ? 'Save*' : 'Save'}
+          </button>
+
           {/* Project Selector */}
           <ProjectSelector
             projects={projects}
@@ -671,7 +921,7 @@ const App: React.FC = () => {
           <TreeManager
             trees={projectTrees}
             activeTreeId={activeTreeId}
-            onSelectTree={(id) => { setActiveTreeId(id); setSelectedNodeId(null); setCurrentView('tree'); }}
+            onSelectTree={(id) => guardedNavigate(() => { setActiveTreeId(id); setSelectedNodeId(null); setCurrentView('tree'); })}
             onCreateTree={handleCreateTree}
             onDeleteTree={handleDeleteTree}
             onRenameTree={handleRenameTree}
@@ -706,13 +956,6 @@ const App: React.FC = () => {
             )}
           </button>
 
-          {/* Status legend */}
-          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-status-pending-bg)', border: '1px solid var(--color-status-pending-border)' }}></span> Pending
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-status-active-bg)', border: '1px solid var(--color-status-active-border)' }}></span> Active
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-status-ruled-out-bg)', border: '1px solid var(--color-status-ruled-out-border)' }}></span> Ruled Out
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: 'var(--color-status-confirmed-bg)', border: '1px solid var(--color-status-confirmed-border)' }}></span> Confirmed
-          </div>
         </div>
       </div>
 
@@ -832,6 +1075,45 @@ const App: React.FC = () => {
           onConfirm={handleImportConfirm}
           onClose={() => setImportCandidates(null)}
         />
+      )}
+
+      {pendingNavigation && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-[80]" />
+          <div
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] w-[420px] rounded-xl shadow-2xl overflow-hidden"
+            style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-primary)' }}
+          >
+            <div className="px-6 py-5" style={{ borderBottom: '1px solid var(--color-border-primary)' }}>
+              <h2 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>Unsaved Changes</h2>
+              <p className="text-sm mt-2" style={{ color: 'var(--color-text-secondary)' }}>
+                Save this project before leaving your current work?
+              </p>
+            </div>
+            <div className="px-6 py-4 flex justify-end gap-2">
+              <button
+                onClick={() => setPendingNavigation(null)}
+                className="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+                style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLeaveWithoutSaving}
+                className="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+                style={{ backgroundColor: 'var(--color-surface-tertiary)', color: 'var(--color-text-secondary)' }}
+              >
+                Leave Without Saving
+              </button>
+              <button
+                onClick={() => void handleSaveAndContinue()}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

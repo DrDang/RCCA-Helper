@@ -94,18 +94,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Divider */}
           <div style={{ borderTop: '1px solid var(--color-border-primary)' }} />
 
-          {/* Backup section */}
+          {/* Auto-save section */}
           <div>
             <h3
               className="text-sm font-semibold mb-3 flex items-center gap-2"
               style={{ color: 'var(--color-text-secondary)' }}
             >
-              <HardDrive size={16} /> Backup & Export
+              <HardDrive size={16} /> Auto-save & Export
             </h3>
 
-            {/* Auto-backup toggle */}
+            {/* Auto-save toggle */}
             <label className="flex items-center justify-between mb-3 cursor-pointer">
-              <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Auto-backup</span>
+              <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Auto-save</span>
               <input
                 type="checkbox"
                 checked={settings.autoBackupEnabled}
@@ -142,7 +142,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* Project file name */}
             <div className="mb-4">
               <label className="text-sm block mb-1" style={{ color: 'var(--color-text-secondary)' }}>
-                Backup file name prefix
+                Fallback backup file name prefix
               </label>
               <input
                 type="text"

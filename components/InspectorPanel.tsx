@@ -193,7 +193,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 
   // Check if this is a root cause node (for showing Resolutions tab)
   const isIssueNode = selectedNode.type === NodeType.ISSUE;
-  const isRootCauseNode = !isIssueNode && selectedNode.status === NodeStatus.CONFIRMED && selectedNode.isRootCause === true;
+  const isLeafNode = !selectedNode.children || selectedNode.children.length === 0;
+  const canMarkRootCause = !isIssueNode && isLeafNode && selectedNode.status === NodeStatus.CONFIRMED;
+  const isRootCauseNode = canMarkRootCause && selectedNode.isRootCause === true;
 
   // Filter resolutions linked to this node
   const nodeResolutions = resolutions.filter(r => r.linkedCauseIds.includes(selectedNode.id));
@@ -373,19 +375,21 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         <CheckCircle2 size={12} /> Evidence verified.
                     </p>
                 )}
-                {!isIssueNode && selectedNode.status === NodeStatus.CONFIRMED && (
+                {canMarkRootCause && (
                     <div className="mt-3 p-3 rounded-lg border-2 border-amber-300 bg-amber-50">
                         <label className="flex items-center gap-2 cursor-pointer select-none">
                             <input
                                 type="checkbox"
                                 checked={selectedNode.isRootCause ?? false}
-                                onChange={(e) => onUpdateNode({...selectedNode, isRootCause: e.target.checked})}
+                                onChange={(e) => {
+                                  onUpdateNode({...selectedNode, isRootCause: e.target.checked});
+                                }}
                                 className="rounded text-amber-600 focus:ring-amber-500"
                             />
                             <span className="text-sm font-semibold text-amber-800">Mark as Root Cause</span>
                         </label>
                         <p className="text-xs text-amber-600 mt-1">
-                            Designate this confirmed cause as a root cause of the investigation.
+                            Designate this confirmed leaf cause as a root cause of the investigation.
                         </p>
                     </div>
                 )}
