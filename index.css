@@ -46,6 +46,20 @@
   --color-status-confirmed-border: #ef4444;
   --color-status-confirmed-text: #991b1b;
 
+  /* Issue lifecycle */
+  --color-issue-open-bg: #eff6ff;
+  --color-issue-open-border: #3b82f6;
+  --color-issue-open-text: #1e40af;
+  --color-issue-investigating-bg: #fff7ed;
+  --color-issue-investigating-border: #f97316;
+  --color-issue-investigating-text: #9a3412;
+  --color-issue-resolved-bg: #f0fdf4;
+  --color-issue-resolved-border: #22c55e;
+  --color-issue-resolved-text: #166534;
+  --color-issue-closed-bg: #f8fafc;
+  --color-issue-closed-border: #94a3b8;
+  --color-issue-closed-text: #475569;
+
   /* Action statuses */
   --color-action-open-bg: #fff7ed;
   --color-action-open-border: #f97316;
@@ -130,6 +144,20 @@
   --color-status-confirmed-bg: #450a0a;
   --color-status-confirmed-border: #f87171;
   --color-status-confirmed-text: #fecaca;
+
+  /* Issue lifecycle */
+  --color-issue-open-bg: #172554;
+  --color-issue-open-border: #60a5fa;
+  --color-issue-open-text: #bfdbfe;
+  --color-issue-investigating-bg: #431407;
+  --color-issue-investigating-border: #fb923c;
+  --color-issue-investigating-text: #fed7aa;
+  --color-issue-resolved-bg: #052e16;
+  --color-issue-resolved-border: #4ade80;
+  --color-issue-resolved-text: #bbf7d0;
+  --color-issue-closed-bg: #1e293b;
+  --color-issue-closed-border: #64748b;
+  --color-issue-closed-text: #94a3b8;
 
   /* Action statuses */
   --color-action-open-bg: #431407;

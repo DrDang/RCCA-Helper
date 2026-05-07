@@ -6,7 +6,7 @@ import { ProjectSelector } from './components/ProjectSelector';
 import { DashboardView } from './components/DashboardView';
 import { ResolutionsSummary } from './components/ResolutionsSummary';
 import { InvestigationActionsSummary } from './components/InvestigationActionsSummary';
-import { CauseNode, ActionItem, Note, NodeStatus, NodeType, SavedTree, SavedTreeV2, AppSettings, ResolutionItem, Project } from './types';
+import { CauseNode, ActionItem, Note, IssueStatus, NodeStatus, NodeType, SavedTree, SavedTreeV2, AppSettings, ResolutionItem, Project } from './types';
 import { createInitialTree } from './constants';
 import { loadAppState, saveAppState, exportTreeAsJson, exportAllTreesAsJson, parseImportFile, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS, createDefaultProject, exportProjectAsJson, parseProjectImportFile, ProjectImportData } from './persistence';
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
@@ -254,7 +254,10 @@ const App: React.FC = () => {
   const handleUpdateNode = (updatedNode: CauseNode) => {
     updateActiveTree(tree => ({
       ...tree,
-      treeData: updateTree(tree.treeData, updatedNode)
+      treeData: updateTree(tree.treeData, updatedNode),
+      isResolved: updatedNode.id === tree.treeData.id
+        ? updatedNode.status === IssueStatus.RESOLVED || updatedNode.status === IssueStatus.CLOSED
+        : tree.isResolved,
     }));
   };
 
@@ -472,7 +475,17 @@ const App: React.FC = () => {
 
   const handleToggleResolved = (id: string) => {
     setTrees(prev => prev.map(t =>
-      t.id === id ? { ...t, isResolved: !t.isResolved, updatedAt: new Date().toISOString() } : t
+      t.id === id
+        ? {
+            ...t,
+            isResolved: !t.isResolved,
+            treeData: {
+              ...t.treeData,
+              status: !t.isResolved ? IssueStatus.RESOLVED : IssueStatus.INVESTIGATING,
+            },
+            updatedAt: new Date().toISOString()
+          }
+        : t
     ));
   };
 

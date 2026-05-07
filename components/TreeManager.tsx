@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { SavedTree } from '../types';
-import { STATUS_COLORS } from '../constants';
+import { getNodeStatusColors, getNodeStatusLabel } from '../constants';
 import { ChevronDown, Plus, Upload, Download, Trash2, Pencil, Check, X, Package, FileText, FileStack, CheckCircle2, Circle, Eye, EyeOff } from 'lucide-react';
 
 interface TreeManagerProps {
@@ -139,11 +139,11 @@ export const TreeManager: React.FC<TreeManagerProps> = ({
                     }
                   }}
                 >
-                  {/* Root node status indicator */}
+                  {/* Issue lifecycle indicator */}
                   <div
                     className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: STATUS_COLORS[tree.treeData.status].border }}
-                    title={tree.treeData.status.replace('_', ' ')}
+                    style={{ backgroundColor: getNodeStatusColors(tree.treeData).border }}
+                    title={getNodeStatusLabel(tree.treeData)}
                   />
                   <div className="flex-1 min-w-0">
                     {renamingId === tree.id ? (

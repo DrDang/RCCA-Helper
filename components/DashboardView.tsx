@@ -1,6 +1,6 @@
 import React from 'react';
-import { SavedTree, NodeStatus } from '../types';
-import { STATUS_COLORS, RESOLUTION_STATUS_COLORS } from '../constants';
+import { SavedTree, IssueStatus, NodeStatus } from '../types';
+import { getNodeStatusColors, getNodeStatusLabel, NODE_STATUS_LABELS, STATUS_COLORS, RESOLUTION_STATUS_COLORS } from '../constants';
 import { getTreeStats, formatDate } from '../treeUtils';
 import { FileText, FileStack } from 'lucide-react';
 
@@ -10,13 +10,6 @@ interface DashboardViewProps {
   onGenerateReport: (id: string) => void;
   onGenerateBulkReport: () => void;
 }
-
-const STATUS_LABELS: Record<NodeStatus, string> = {
-  [NodeStatus.PENDING]: 'Pending',
-  [NodeStatus.ACTIVE]: 'Active',
-  [NodeStatus.RULED_OUT]: 'Ruled Out',
-  [NodeStatus.CONFIRMED]: 'Confirmed',
-};
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   trees,
@@ -86,11 +79,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         // Determine if an investigation is "active" (has work in progress)
         const isActive = (tree: SavedTree) => {
           const stats = getTreeStats(tree);
+          const hasActiveIssue = tree.treeData.status === IssueStatus.OPEN || tree.treeData.status === IssueStatus.INVESTIGATING;
           const hasActiveNodes = stats.nodesByStatus[NodeStatus.ACTIVE] > 0 || stats.nodesByStatus[NodeStatus.CONFIRMED] > 0;
           const hasOpenActions = (stats.actionsByStatus['Open'] ?? 0) > 0
             || (stats.actionsByStatus['In Progress'] ?? 0) > 0
             || (stats.actionsByStatus['Blocked'] ?? 0) > 0;
-          return hasActiveNodes || hasOpenActions;
+          return hasActiveIssue || hasActiveNodes || hasOpenActions;
         };
 
         const activeTrees = trees.filter(isActive);
@@ -98,7 +92,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         const renderCard = (tree: SavedTree) => {
           const stats = getTreeStats(tree);
-          const rootColors = STATUS_COLORS[tree.treeData.status];
+          const rootColors = getNodeStatusColors(tree.treeData);
 
           return (
             <div
@@ -116,12 +110,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{tree.name}</h3>
                 </div>
                 <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  Updated {formatDate(tree.updatedAt)}
+                  {getNodeStatusLabel(tree.treeData)} · Updated {formatDate(tree.updatedAt)}
                 </div>
               </div>
 
               <div className="px-4 pb-3">
-                <div className="text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Nodes</div>
+                <div className="text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Cause Nodes</div>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.values(NodeStatus).map(status => {
                     const count = stats.nodesByStatus[status];
@@ -137,7 +131,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           border: `1px solid ${colors.border}`,
                         }}
                       >
-                        {count} {STATUS_LABELS[status]}
+                        {count} {NODE_STATUS_LABELS[status]}
                       </span>
                     );
                   })}

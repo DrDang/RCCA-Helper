@@ -1,4 +1,4 @@
-import { CauseNode, NodeStatus, NodeType } from './types';
+import { CauseNode, IssueStatus, NodeStatus, NodeType } from './types';
 
 export const CARD_WIDTH = 240;
 export const CARD_HEIGHT = 150;
@@ -27,6 +27,66 @@ export const STATUS_COLORS = {
   }
 };
 
+// Theme-aware issue lifecycle colors (resolved via CSS custom properties)
+export const ISSUE_STATUS_COLORS = {
+  [IssueStatus.OPEN]: {
+    bg: 'var(--color-issue-open-bg)',
+    border: 'var(--color-issue-open-border)',
+    text: 'var(--color-issue-open-text)'
+  },
+  [IssueStatus.INVESTIGATING]: {
+    bg: 'var(--color-issue-investigating-bg)',
+    border: 'var(--color-issue-investigating-border)',
+    text: 'var(--color-issue-investigating-text)'
+  },
+  [IssueStatus.RESOLVED]: {
+    bg: 'var(--color-issue-resolved-bg)',
+    border: 'var(--color-issue-resolved-border)',
+    text: 'var(--color-issue-resolved-text)'
+  },
+  [IssueStatus.CLOSED]: {
+    bg: 'var(--color-issue-closed-bg)',
+    border: 'var(--color-issue-closed-border)',
+    text: 'var(--color-issue-closed-text)'
+  }
+};
+
+export const ISSUE_STATUS_LABELS: Record<IssueStatus, string> = {
+  [IssueStatus.OPEN]: 'Open',
+  [IssueStatus.INVESTIGATING]: 'Investigating',
+  [IssueStatus.RESOLVED]: 'Resolved',
+  [IssueStatus.CLOSED]: 'Closed',
+};
+
+export const NODE_STATUS_LABELS: Record<NodeStatus, string> = {
+  [NodeStatus.PENDING]: 'Pending',
+  [NodeStatus.ACTIVE]: 'Active',
+  [NodeStatus.RULED_OUT]: 'Ruled Out',
+  [NodeStatus.CONFIRMED]: 'Confirmed',
+};
+
+export function isNodeStatus(status: CauseNode['status']): status is NodeStatus {
+  return Object.values(NodeStatus).includes(status as NodeStatus);
+}
+
+export function isIssueStatus(status: CauseNode['status']): status is IssueStatus {
+  return Object.values(IssueStatus).includes(status as IssueStatus);
+}
+
+export function getNodeStatusColors(node: CauseNode): { bg: string; border: string; text: string } {
+  if (node.type === NodeType.ISSUE && isIssueStatus(node.status)) {
+    return ISSUE_STATUS_COLORS[node.status];
+  }
+  return STATUS_COLORS[isNodeStatus(node.status) ? node.status : NodeStatus.PENDING];
+}
+
+export function getNodeStatusLabel(node: CauseNode): string {
+  if (node.type === NodeType.ISSUE && isIssueStatus(node.status)) {
+    return ISSUE_STATUS_LABELS[node.status];
+  }
+  return NODE_STATUS_LABELS[isNodeStatus(node.status) ? node.status : NodeStatus.PENDING];
+}
+
 // Hardcoded light-mode colors for standalone HTML reports
 export const REPORT_STATUS_COLORS = {
   [NodeStatus.PENDING]: {
@@ -50,6 +110,20 @@ export const REPORT_STATUS_COLORS = {
     text: '#991b1b'
   }
 };
+
+export const REPORT_ISSUE_STATUS_COLORS = {
+  [IssueStatus.OPEN]: { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af' },
+  [IssueStatus.INVESTIGATING]: { bg: '#fff7ed', border: '#f97316', text: '#9a3412' },
+  [IssueStatus.RESOLVED]: { bg: '#f0fdf4', border: '#22c55e', text: '#166534' },
+  [IssueStatus.CLOSED]: { bg: '#f8fafc', border: '#94a3b8', text: '#475569' },
+};
+
+export function getReportNodeStatusColors(node: CauseNode): { bg: string; border: string; text: string } {
+  if (node.type === NodeType.ISSUE && isIssueStatus(node.status)) {
+    return REPORT_ISSUE_STATUS_COLORS[node.status];
+  }
+  return REPORT_STATUS_COLORS[isNodeStatus(node.status) ? node.status : NodeStatus.PENDING];
+}
 
 // Theme-aware resolution status colors (resolved via CSS custom properties)
 export const RESOLUTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -102,7 +176,7 @@ export function createInitialTree(label: string = 'New Issue'): CauseNode {
     label,
     description: 'Describe the primary failure mode here.',
     rationale: '',
-    status: NodeStatus.PENDING,
+    status: IssueStatus.INVESTIGATING,
     type: NodeType.ISSUE,
     children: []
   };

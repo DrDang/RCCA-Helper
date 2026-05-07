@@ -1,4 +1,5 @@
-import { CauseNode, SavedTree, ActionItem, ResolutionItem, NodeStatus } from './types';
+import { CauseNode, SavedTree, ActionItem, ResolutionItem, NodeStatus, NodeType } from './types';
+import { isNodeStatus } from './constants';
 
 export interface TreeStats {
   totalNodes: number;
@@ -31,7 +32,9 @@ export function countNodesByStatus(nodes: CauseNode[]): Record<NodeStatus, numbe
     [NodeStatus.CONFIRMED]: 0,
   };
   for (const node of nodes) {
-    counts[node.status]++;
+    if (isNodeStatus(node.status)) {
+      counts[node.status]++;
+    }
   }
   return counts;
 }
@@ -67,16 +70,17 @@ export function countResolutionsByStatus(resolutions: ResolutionItem[]): Record<
 
 export function getTreeStats(tree: SavedTree): TreeStats {
   const allNodes = flattenTree(tree.treeData);
+  const causeNodes = allNodes.filter(n => n.type !== NodeType.ISSUE);
   const resolutions = tree.resolutions ?? [];
   return {
     totalNodes: allNodes.length,
-    nodesByStatus: countNodesByStatus(allNodes),
+    nodesByStatus: countNodesByStatus(causeNodes),
     actionsByStatus: countActionsByStatus(tree.actions),
     totalActions: tree.actions.length,
     totalNotes: tree.notes.length,
     totalEvidence: tree.notes.filter(n => n.isEvidence).length,
-    confirmedCauses: allNodes.filter(n => n.status === NodeStatus.CONFIRMED),
-    rootCauses: allNodes.filter(n => n.isRootCause === true),
+    confirmedCauses: causeNodes.filter(n => n.status === NodeStatus.CONFIRMED),
+    rootCauses: causeNodes.filter(n => n.isRootCause === true),
     resolutionsByStatus: countResolutionsByStatus(resolutions),
     totalResolutions: resolutions.length,
   };

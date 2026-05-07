@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { ActionItem, ActionUpdate, CauseNode, Note, NodeStatus, NodeType, ResolutionItem, ResolutionStatus } from '../types';
-import { STATUS_COLORS, RESOLUTION_STATUS_COLORS } from '../constants';
+import { ActionItem, ActionUpdate, CauseNode, IssueStatus, Note, NodeStatus, NodeType, ResolutionItem, ResolutionStatus } from '../types';
+import { ISSUE_STATUS_COLORS, ISSUE_STATUS_LABELS, NODE_STATUS_LABELS, STATUS_COLORS, RESOLUTION_STATUS_COLORS } from '../constants';
 import {
     ClipboardList,
     StickyNote,
@@ -192,7 +192,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   const nodeNotes = notes.filter(n => n.referenceId === selectedNode.id);
 
   // Check if this is a root cause node (for showing Resolutions tab)
-  const isRootCauseNode = selectedNode.status === NodeStatus.CONFIRMED && selectedNode.isRootCause === true;
+  const isIssueNode = selectedNode.type === NodeType.ISSUE;
+  const isRootCauseNode = !isIssueNode && selectedNode.status === NodeStatus.CONFIRMED && selectedNode.isRootCause === true;
 
   // Filter resolutions linked to this node
   const nodeResolutions = resolutions.filter(r => r.linkedCauseIds.includes(selectedNode.id));
@@ -212,6 +213,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       updatedNode.isRootCause = false;
     }
     onUpdateNode(updatedNode);
+  };
+
+  const handleIssueStatusChange = (newStatus: IssueStatus) => {
+    onUpdateNode({ ...selectedNode, status: newStatus, isRootCause: false });
   };
 
   return (
@@ -317,9 +322,31 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
             </div>
 
             <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase" style={{ color: 'var(--color-text-tertiary)' }}>Investigation Status</label>
+                <label className="text-xs font-semibold uppercase" style={{ color: 'var(--color-text-tertiary)' }}>
+                  {isIssueNode ? 'Issue Lifecycle' : 'Investigation Status'}
+                </label>
                 <div className="grid grid-cols-2 gap-2">
-                    {Object.values(NodeStatus).map((status) => (
+                    {isIssueNode ? Object.values(IssueStatus).map((status) => (
+                        <button
+                            key={status}
+                            onClick={() => handleIssueStatusChange(status)}
+                            className={`
+                                p-2 rounded text-xs font-medium border transition-all flex items-center gap-2 justify-center
+                                ${selectedNode.status === status ? 'ring-2 ring-offset-1 ring-slate-400' : 'opacity-70 hover:opacity-100'}
+                            `}
+                            style={{
+                                backgroundColor: ISSUE_STATUS_COLORS[status].bg,
+                                borderColor: ISSUE_STATUS_COLORS[status].border,
+                                color: ISSUE_STATUS_COLORS[status].text
+                            }}
+                        >
+                            {status === IssueStatus.OPEN && <AlertTriangle size={12} />}
+                            {status === IssueStatus.INVESTIGATING && <ClipboardList size={12} />}
+                            {status === IssueStatus.RESOLVED && <CheckCircle2 size={12} />}
+                            {status === IssueStatus.CLOSED && <X size={12} />}
+                            {ISSUE_STATUS_LABELS[status]}
+                        </button>
+                    )) : Object.values(NodeStatus).map((status) => (
                         <button
                             key={status}
                             onClick={() => handleStatusChange(status)}
@@ -337,16 +364,16 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                             {status === NodeStatus.ACTIVE && <ClipboardList size={12} />}
                             {status === NodeStatus.RULED_OUT && <CheckCircle2 size={12} />}
                             {status === NodeStatus.CONFIRMED && <XCircle size={12} />}
-                            {status.replace('_', ' ')}
+                            {NODE_STATUS_LABELS[status]}
                         </button>
                     ))}
                 </div>
-                {selectedNode.status === NodeStatus.RULED_OUT && (
+                {!isIssueNode && selectedNode.status === NodeStatus.RULED_OUT && (
                     <p className="text-xs text-green-600 italic mt-1 flex items-center gap-1">
                         <CheckCircle2 size={12} /> Evidence verified.
                     </p>
                 )}
-                {selectedNode.status === NodeStatus.CONFIRMED && (
+                {!isIssueNode && selectedNode.status === NodeStatus.CONFIRMED && (
                     <div className="mt-3 p-3 rounded-lg border-2 border-amber-300 bg-amber-50">
                         <label className="flex items-center gap-2 cursor-pointer select-none">
                             <input

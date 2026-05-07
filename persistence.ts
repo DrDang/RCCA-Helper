@@ -1,4 +1,5 @@
-import { AppState, AppSettings, AppStateV2, Project, SavedTree, SavedTreeV2 } from './types';
+import { AppState, AppSettings, AppStateV2, CauseNode, IssueStatus, NodeStatus, NodeType, Project, SavedTree, SavedTreeV2 } from './types';
+import { isIssueStatus, isNodeStatus } from './constants';
 
 const STORAGE_KEY = 'rcca-helper-state';
 const DEFAULT_PROJECT_ID = 'default-project';
@@ -34,10 +35,35 @@ export function setLastExportTimestamp(): void {
   localStorage.setItem(LAST_EXPORT_KEY, new Date().toISOString());
 }
 
-// Ensure backward compatibility by adding resolutions array if missing
+function migrateNode(node: CauseNode, isRoot: boolean = false): CauseNode {
+  const migratedChildren = node.children?.map(child => migrateNode(child, false));
+
+  if (isRoot || node.type === NodeType.ISSUE) {
+    return {
+      ...node,
+      status: isIssueStatus(node.status) ? node.status : IssueStatus.INVESTIGATING,
+      type: NodeType.ISSUE,
+      isRootCause: false,
+      children: migratedChildren ?? [],
+    };
+  }
+
+  return {
+    ...node,
+    status: isNodeStatus(node.status) ? node.status : NodeStatus.PENDING,
+    children: migratedChildren,
+  };
+}
+
+// Ensure backward compatibility by adding resolutions array and migrating root issue status if needed
 function migrateTree(tree: SavedTree): SavedTree {
+  const migratedRoot = migrateNode(tree.treeData, true);
   return {
     ...tree,
+    treeData: {
+      ...migratedRoot,
+      status: tree.isResolved ? IssueStatus.RESOLVED : migratedRoot.status,
+    },
     resolutions: tree.resolutions ?? []
   };
 }
@@ -143,7 +169,13 @@ export function parseProjectImportFile(file: File): Promise<ProjectImportData | 
 
         // Check if it's a project export
         if (data.type === 'rcca-project' && data.project && data.trees) {
-          resolve(data as ProjectImportData);
+          resolve({
+            ...(data as ProjectImportData),
+            trees: (data.trees as SavedTreeV2[]).map(tree => ({
+              ...migrateTree(tree),
+              projectId: tree.projectId,
+            })),
+          });
           return;
         }
 

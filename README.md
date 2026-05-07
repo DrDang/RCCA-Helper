@@ -64,7 +64,9 @@ If you just want to run the built app without Node.js, npm, or a dev server:
 - On Windows, double-click `Run RCCA Helper.bat`
 - On macOS, double-click `Run RCCA Helper.command`
 
-These start a tiny local server for the checked-in `dist/` folder and then open the app in your browser.
+These open the portable checked-in `dist/RCCA Helper.html` file directly in your browser. No command window or localhost port needs to stay open.
+
+If the portable HTML file is missing, the launchers fall back to the older local-server launcher for the checked-in `dist/` folder.
 
 On macOS, you may need to right-click `Run RCCA Helper.command` and choose `Open` the first time so Gatekeeper allows it.
 
@@ -89,8 +91,7 @@ npm run build
 npm run preview
 ```
 
-The production site is emitted to `dist/` as static assets, and that is what the double-click launchers open.
-Keep the launcher window open while using the app, since it is hosting the local server.
+The production site is emitted to `dist/` as static assets. The build also creates `dist/RCCA Helper.html`, a single-file portable copy that the double-click launchers open directly.
 
 If you change the source code, run `npm run build` again so the checked-in `dist/` stays current.
 

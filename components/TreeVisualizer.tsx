@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import html2canvas from 'html2canvas';
-import { CauseNode, ActionItem, NodeStatus, ResolutionItem } from '../types';
-import { CARD_WIDTH, CARD_HEIGHT, STATUS_COLORS } from '../constants';
+import { CauseNode, ActionItem, IssueStatus, NodeStatus, NodeType, ResolutionItem } from '../types';
+import { CARD_WIDTH, CARD_HEIGHT, getNodeStatusColors } from '../constants';
 import { Plus, Move, ClipboardList, Crosshair, Shield, Download } from 'lucide-react';
 
 interface TreeVisualizerProps {
@@ -181,7 +181,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
           {/* Links — colored by target node status */}
           {links.map((link) => {
             const targetStatus = link.target.data.status;
-            const lineColor = STATUS_COLORS[targetStatus].border;
+            const lineColor = getNodeStatusColors(link.target.data).border;
 
             return (
               <path
@@ -197,7 +197,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
 
           {/* Nodes */}
           {nodes.map((node) => {
-            const styles = STATUS_COLORS[node.data.status];
+            const styles = getNodeStatusColors(node.data);
             const isSelected = node.data.id === selectedId;
             const hasActions = nodesWithActions.has(node.data.id);
             const hasResolutions = nodesWithResolutions.has(node.data.id);
@@ -229,11 +229,25 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                   }}
                 >
                   {/* Status Indicator Dot */}
-                  <div className={`absolute -top-2 -right-2 w-4 h-4 rounded-full border border-white shadow-sm
-                      ${node.data.status === NodeStatus.CONFIRMED ? 'bg-red-500' :
-                        node.data.status === NodeStatus.RULED_OUT ? 'bg-green-500' :
-                        node.data.status === NodeStatus.ACTIVE ? 'bg-orange-500' : 'bg-slate-300'}
-                  `}/>
+                  <div
+                    className={`absolute -top-2 -right-2 w-4 h-4 rounded-full border border-white shadow-sm ${
+                      node.data.type === NodeType.ISSUE
+                        ? node.data.status === IssueStatus.RESOLVED
+                          ? 'bg-green-500'
+                          : node.data.status === IssueStatus.CLOSED
+                            ? 'bg-slate-400'
+                            : node.data.status === IssueStatus.OPEN
+                              ? 'bg-blue-500'
+                              : 'bg-orange-500'
+                        : node.data.status === NodeStatus.CONFIRMED
+                          ? 'bg-red-500'
+                          : node.data.status === NodeStatus.RULED_OUT
+                            ? 'bg-green-500'
+                            : node.data.status === NodeStatus.ACTIVE
+                              ? 'bg-orange-500'
+                              : 'bg-slate-300'
+                    }`}
+                  />
 
                   {/* Action indicator badge */}
                   {hasActions && (

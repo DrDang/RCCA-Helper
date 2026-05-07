@@ -5,6 +5,13 @@ export enum NodeStatus {
   CONFIRMED = 'CONFIRMED' // Red
 }
 
+export enum IssueStatus {
+  OPEN = 'OPEN',
+  INVESTIGATING = 'INVESTIGATING',
+  RESOLVED = 'RESOLVED',
+  CLOSED = 'CLOSED'
+}
+
 export enum NodeType {
   ISSUE = 'ISSUE',
   CATEGORY = 'CATEGORY',
@@ -17,7 +24,7 @@ export interface CauseNode {
   label: string;
   description: string;
   rationale: string;
-  status: NodeStatus;
+  status: NodeStatus | IssueStatus;
   type: NodeType;
   isRootCause?: boolean;
   children?: CauseNode[];

@@ -2,7 +2,7 @@
 
 Thanks for helping improve RCCA Helper.
 
-This project is intentionally lightweight: a browser-based RCCA workspace with a checked-in production build and simple cross-platform launchers. The goal of this guide is to keep contributions easy to make and easy to review.
+This project is intentionally lightweight: a browser-based RCCA workspace with a checked-in production build, a portable single-file HTML package, and simple cross-platform launchers. The goal of this guide is to keep contributions easy to make and easy to review.
 
 ## Local Setup
 
@@ -32,8 +32,9 @@ This refreshes the checked-in `dist/` output used by the double-click launchers.
 
 ## Working With The Portable Launchers
 
-- `Run RCCA Helper.command` starts a tiny local server on macOS using `python3`
-- `Run RCCA Helper.bat` starts the Windows launcher, which delegates to `serve-rcca-helper.ps1`
+- `Run RCCA Helper.command` opens `dist/RCCA Helper.html` directly on macOS
+- `Run RCCA Helper.bat` opens `dist/RCCA Helper.html` directly on Windows
+- if the portable HTML is missing, the launchers fall back to the local-server flow
 - both launchers expect the production build to exist in `dist/`
 
 If you change app behavior, remember that users may run the checked-in build directly without using Node.js.

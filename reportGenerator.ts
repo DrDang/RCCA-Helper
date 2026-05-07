@@ -1,13 +1,6 @@
 import { SavedTree, CauseNode, NodeStatus, ResolutionItem } from './types';
-import { REPORT_STATUS_COLORS as STATUS_COLORS, REPORT_RESOLUTION_STATUS_COLORS } from './constants';
+import { getNodeStatusLabel, getReportNodeStatusColors, NODE_STATUS_LABELS, REPORT_STATUS_COLORS as STATUS_COLORS, REPORT_RESOLUTION_STATUS_COLORS } from './constants';
 import { flattenTree, getTreeStats, formatDate } from './treeUtils';
-
-const STATUS_LABELS: Record<NodeStatus, string> = {
-  [NodeStatus.PENDING]: 'Pending',
-  [NodeStatus.ACTIVE]: 'Active',
-  [NodeStatus.RULED_OUT]: 'Ruled Out',
-  [NodeStatus.CONFIRMED]: 'Confirmed',
-};
 
 function escapeHtml(text: string): string {
   return text
@@ -22,7 +15,7 @@ function statusBadge(status: string, colors: { bg: string; border: string; text:
 }
 
 function renderTreeHierarchy(node: CauseNode, notes: { referenceId: string; content: string; isEvidence: boolean }[], depth: number = 0): string {
-  const colors = STATUS_COLORS[node.status];
+  const colors = getReportNodeStatusColors(node);
   const indent = depth * 24;
   const nodeNotes = notes.filter(n => n.referenceId === node.id);
 
@@ -32,7 +25,7 @@ function renderTreeHierarchy(node: CauseNode, notes: { referenceId: string; cont
         <span style="width:10px;height:10px;border-radius:50%;background:${colors.border};display:inline-block;flex-shrink:0"></span>
         <strong style="color:${colors.text}">${escapeHtml(node.label)}</strong>
         <span style="font-size:11px;color:#64748b;text-transform:uppercase">${escapeHtml(node.type)}</span>
-        ${statusBadge(STATUS_LABELS[node.status], colors)}
+        ${statusBadge(getNodeStatusLabel(node), colors)}
         ${node.isRootCause ? '<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#f59e0b;color:#fff;margin-left:4px">ROOT CAUSE</span>' : ''}
       </div>`;
 
@@ -188,7 +181,7 @@ function renderStatGrid(label: string, counts: Record<string, number>, colorMap:
 
 function renderInvestigation(tree: SavedTree, headingTag: 'h1' | 'h2' = 'h1', anchorId?: string): string {
   const stats = getTreeStats(tree);
-  const rootColors = STATUS_COLORS[tree.treeData.status];
+  const rootColors = getReportNodeStatusColors(tree.treeData);
 
   const actionColorMap: Record<string, { bg: string; border: string; text: string }> = {
     'Open': { bg: '#fff7ed', border: '#f97316', text: '#9a3412' },
@@ -200,11 +193,11 @@ function renderInvestigation(tree: SavedTree, headingTag: 'h1' | 'h2' = 'h1', an
 
   const nodeStatusDisplay: Record<string, { bg: string; border: string; text: string }> = {};
   for (const s of Object.values(NodeStatus)) {
-    nodeStatusDisplay[STATUS_LABELS[s]] = STATUS_COLORS[s];
+    nodeStatusDisplay[NODE_STATUS_LABELS[s]] = STATUS_COLORS[s];
   }
   const nodeCountsDisplay: Record<string, number> = {};
   for (const [s, count] of Object.entries(stats.nodesByStatus)) {
-    nodeCountsDisplay[STATUS_LABELS[s as NodeStatus]] = count;
+    nodeCountsDisplay[NODE_STATUS_LABELS[s as NodeStatus]] = count;
   }
 
   let html = '';
@@ -214,7 +207,7 @@ function renderInvestigation(tree: SavedTree, headingTag: 'h1' | 'h2' = 'h1', an
     <${headingTag} style="color:#1e293b;margin-bottom:4px">${escapeHtml(tree.name)}</${headingTag}>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;color:#64748b;font-size:13px">
       <span style="width:10px;height:10px;border-radius:50%;background:${rootColors.border};display:inline-block"></span>
-      <span>Root status: ${STATUS_LABELS[tree.treeData.status]}</span>
+      <span>Issue lifecycle: ${getNodeStatusLabel(tree.treeData)}</span>
       <span>|</span>
       <span>Created: ${formatDate(tree.createdAt)}</span>
       <span>|</span>
@@ -223,7 +216,7 @@ function renderInvestigation(tree: SavedTree, headingTag: 'h1' | 'h2' = 'h1', an
 
   // Summary stats
   html += `<h3 style="color:#334155;border-bottom:1px solid #e2e8f0;padding-bottom:6px">Executive Summary</h3>`;
-  html += renderStatGrid('Nodes by Status', nodeCountsDisplay, nodeStatusDisplay);
+  html += renderStatGrid('Cause Nodes by Status', nodeCountsDisplay, nodeStatusDisplay);
   html += renderStatGrid('Actions by Status', stats.actionsByStatus, actionColorMap);
 
   // Identified Root Causes (explicitly marked)
@@ -328,7 +321,7 @@ export function generateBulkReport(trees: SavedTree[]): string {
     <ol style="margin:0;padding-left:20px">`;
   for (let i = 0; i < trees.length; i++) {
     const t = trees[i];
-    const rootColors = STATUS_COLORS[t.treeData.status];
+    const rootColors = getReportNodeStatusColors(t.treeData);
     body += `<li style="margin-bottom:4px">
       <a href="#inv-${i}" style="color:#4f46e5;text-decoration:none">
         <span style="width:8px;height:8px;border-radius:50%;background:${rootColors.border};display:inline-block;margin-right:4px"></span>
