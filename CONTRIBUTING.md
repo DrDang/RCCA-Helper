@@ -34,8 +34,8 @@ This refreshes the checked-in `dist/` output used by the double-click launchers.
 
 - `Run RCCA Helper.command` opens `dist/RCCA Helper.html` directly on macOS
 - `Run RCCA Helper.bat` opens `dist/RCCA Helper.html` directly on Windows
-- if the portable HTML is missing, the launchers fall back to the local-server flow
-- both launchers expect the production build to exist in `dist/`
+- if the portable HTML is missing, rebuild with `npm install` and `npm run build`
+- both launchers expect the portable app to exist at `dist/RCCA Helper.html`
 
 If you change app behavior, remember that users may run the checked-in build directly without using Node.js.
 

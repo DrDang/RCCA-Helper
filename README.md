@@ -66,7 +66,7 @@ If you just want to run the built app without Node.js, npm, or a dev server:
 
 These open the portable checked-in `dist/RCCA Helper.html` file directly in your browser. No command window or localhost port needs to stay open.
 
-If the portable HTML file is missing, the launchers fall back to the older local-server launcher for the checked-in `dist/` folder.
+If the portable HTML file is missing, rebuild with `npm install` and `npm run build`.
 
 On macOS, you may need to right-click `Run RCCA Helper.command` and choose `Open` the first time so Gatekeeper allows it.
 
@@ -91,7 +91,9 @@ npm run build
 npm run preview
 ```
 
-The production site is emitted to `dist/` as static assets. The build also creates `dist/RCCA Helper.html`, a single-file portable copy that the double-click launchers open directly.
+The production site is emitted to `dist/` as static assets. The build also creates `dist/RCCA Helper.html`, a single-file portable copy that is the canonical checked-in app launcher target.
+
+`dist/index.html` and `dist/assets/` are Vite build intermediates used to create and preview the app. `dist/RCCA Helper.html` is the file the double-click launchers open.
 
 If you change the source code, run `npm run build` again so the checked-in `dist/` stays current.
 
@@ -111,17 +113,17 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for local setu
 
 ```text
 .
-├── App.tsx
-├── components/
-├── constants.ts
-├── persistence.ts
-├── reportGenerator.ts
-├── Run RCCA Helper.bat
-├── Run RCCA Helper.command
-├── dist/
-├── treeUtils.ts
-├── types.ts
-└── README.md
+|-- App.tsx
+|-- components/
+|-- constants.ts
+|-- persistence.ts
+|-- reportGenerator.ts
+|-- Run RCCA Helper.bat
+|-- Run RCCA Helper.command
+|-- dist/
+|-- treeUtils.ts
+|-- types.ts
+`-- README.md
 ```
 
 ## Tech Stack

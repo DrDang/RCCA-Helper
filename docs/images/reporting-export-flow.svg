@@ -32,8 +32,8 @@
   <text x="886" y="209" fill="#1D4ED8" font-family="Arial, sans-serif" font-size="16" font-weight="700">Project JSON Export</text>
   <text x="886" y="229" fill="#2563EB" font-family="Arial, sans-serif" font-size="12">Move a full project with its investigations.</text>
   <rect x="862" y="260" width="282" height="62" rx="14" fill="#F5F3FF"/>
-  <text x="886" y="287" fill="#6D28D9" font-family="Arial, sans-serif" font-size="16" font-weight="700">Portable_Dist Package</text>
-  <text x="886" y="307" fill="#7C3AED" font-family="Arial, sans-serif" font-size="12">Hand off a local-server build for Windows users.</text>
+  <text x="886" y="287" fill="#6D28D9" font-family="Arial, sans-serif" font-size="16" font-weight="700">Portable HTML App</text>
+  <text x="886" y="307" fill="#7C3AED" font-family="Arial, sans-serif" font-size="12">Open the same single-file app on Windows or macOS.</text>
   <path d="M416 380H1144" stroke="#DDD6FE" stroke-width="2" stroke-dasharray="8 8"/>
   <text x="468" y="420" fill="#111827" font-family="Arial, sans-serif" font-size="28" font-weight="700">Release-Ready Documentation Story</text>
   <text x="468" y="456" fill="#4B5563" font-family="Arial, sans-serif" font-size="16">Show that the project is useful, portable, and understandable at a glance.</text>

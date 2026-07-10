@@ -12,7 +12,6 @@ RCCA Helper — a React single-page application for Root Cause Corrective Action
 npm install          # Install dependencies
 npm run dev          # Start dev server on http://0.0.0.0:3000
 npm run build        # Production build plus portable HTML
-npm run build:web    # Production build via Vite only
 npm run preview      # Preview production build
 ```
 

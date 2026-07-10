@@ -12,7 +12,7 @@ import { chooseJsonOpenFile, chooseJsonSaveFile, createProjectExportData, downlo
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
 import { SettingsModal } from './components/SettingsModal';
 import { ImportDialog } from './components/ImportDialog';
-import { FolderOpen, GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun, Shield, ClipboardList, PanelRightOpen, Save } from 'lucide-react';
+import { FolderOpen, GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun, Shield, ClipboardList, PanelRightOpen, Save, Plus } from 'lucide-react';
 
 const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -518,21 +518,40 @@ const App: React.FC = () => {
   };
 
   // Project management handlers
-  const handleCreateProject = () => {
-    const name = prompt('Project name:', 'New Project');
-    if (!name) return;
+  const createProjectWithInitialInvestigation = (projectName: string) => {
+    const now = new Date().toISOString();
     const newProject: Project = {
       id: crypto.randomUUID(),
-      name,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      name: projectName,
+      createdAt: now,
+      updatedAt: now,
     };
+    const initialTree: SavedTreeV2 = {
+      id: crypto.randomUUID(),
+      projectId: newProject.id,
+      name: 'New Investigation',
+      createdAt: now,
+      updatedAt: now,
+      treeData: createInitialTree('New Investigation'),
+      actions: [],
+      notes: [],
+      resolutions: [],
+    };
+
+    projectSaveHandleRef.current = null;
     setProjects(prev => [...prev, newProject]);
+    setTrees(prev => [...prev, initialTree]);
     setActiveProjectId(newProject.id);
-    setActiveTreeId(null);
+    setActiveTreeId(initialTree.id);
     setSelectedNodeId(null);
+    setCurrentView('tree');
   };
 
+  const handleCreateProject = () => {
+    const name = prompt('Project name:', 'New Project')?.trim();
+    if (!name) return;
+    createProjectWithInitialInvestigation(name);
+  };
   const handleDeleteProject = (id: string) => {
     if (projects.length <= 1) {
       alert('Cannot delete the last project.');
@@ -805,16 +824,25 @@ const App: React.FC = () => {
           </div>
           <h1 className="text-4xl font-bold mb-3" style={{ color: 'var(--color-text-primary)' }}>RCCA Helper</h1>
           <p className="text-lg mb-8" style={{ color: 'var(--color-text-secondary)' }}>
-            Open a saved RCCA JSON file to begin.
+            Start a blank project or open a saved RCCA JSON file.
           </p>
-          <button
-            onClick={() => void handleOpenJsonFile()}
-            disabled={isOpeningFile}
-            className="inline-flex items-center justify-center gap-3 px-8 py-5 rounded-xl text-xl font-bold text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-wait transition-colors shadow-lg"
-          >
-            <FolderOpen size={28} />
-            {isOpeningFile ? 'Opening...' : 'Open JSON File'}
-          </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button
+              onClick={handleCreateProject}
+              className="inline-flex min-w-64 items-center justify-center gap-3 px-8 py-5 rounded-xl text-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-lg"
+            >
+              <Plus size={28} />
+              New Project
+            </button>
+            <button
+              onClick={() => void handleOpenJsonFile()}
+              disabled={isOpeningFile}
+              className="inline-flex min-w-64 items-center justify-center gap-3 px-8 py-5 rounded-xl text-xl font-bold text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-wait transition-colors shadow-lg"
+            >
+              <FolderOpen size={28} />
+              {isOpeningFile ? 'Opening...' : 'Open JSON File'}
+            </button>
+          </div>
           <input
             ref={startupFileInputRef}
             type="file"
