@@ -100,6 +100,59 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
 
   }, []); // Run once on mount
 
+  // Keep the selected card visible when the inspector opens or changes width.
+  useEffect(() => {
+    if (!selectedId || !svgRef.current || !containerRef.current || !zoomRef.current) return;
+
+    const selectedNode = nodes.find(node => node.data.id === selectedId);
+    if (!selectedNode) return;
+
+    const svg = svgRef.current;
+    const container = containerRef.current;
+    const zoom = zoomRef.current;
+    let animationFrame: number | null = null;
+
+    const keepSelectedNodeVisible = () => {
+      const { width } = container.getBoundingClientRect();
+      const currentTransform = d3.zoomTransform(svg);
+      const margin = 32;
+      const nodeLeft = currentTransform.applyX(selectedNode.x);
+      const nodeRight = currentTransform.applyX(selectedNode.x + CARD_WIDTH);
+      let shiftX = 0;
+
+      if (nodeRight > width - margin) {
+        shiftX = width - margin - nodeRight;
+      } else if (nodeLeft < margin) {
+        shiftX = margin - nodeLeft;
+      }
+
+      if (Math.abs(shiftX) < 1) return;
+
+      const nextTransform = d3.zoomIdentity
+        .translate(currentTransform.x + shiftX, currentTransform.y)
+        .scale(currentTransform.k);
+
+      d3.select(svg)
+        .transition()
+        .duration(250)
+        .call(zoom.transform, nextTransform);
+    };
+
+    const scheduleVisibilityCheck = () => {
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(keepSelectedNodeVisible);
+    };
+
+    scheduleVisibilityCheck();
+    const resizeObserver = new ResizeObserver(scheduleVisibilityCheck);
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+    };
+  }, [selectedId, nodes]);
+
   // Re-center the tree view
   const handleRecenter = () => {
     if (!svgRef.current || !containerRef.current || !zoomRef.current) return;

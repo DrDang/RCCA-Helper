@@ -260,6 +260,7 @@ const App: React.FC = () => {
     setActiveProjectId(openedProject.id);
     setActiveTreeId(initialTreeId);
     setSelectedNodeId(null);
+    setInspectorOpen(false);
     setCurrentView('tree');
     projectSaveHandleRef.current = handle ? { projectId: openedProject.id, handle } : null;
     saveAppState({
