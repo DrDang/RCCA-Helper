@@ -4,6 +4,7 @@ import html2canvas from 'html2canvas';
 import { CauseNode, ActionItem, IssueStatus, NodeStatus, NodeType, ResolutionItem } from '../types';
 import { CARD_WIDTH, CARD_HEIGHT, getNodeStatusColors } from '../constants';
 import { Plus, Move, ClipboardList, Crosshair, Shield, Download } from 'lucide-react';
+import { useAppDialog } from './AppDialog';
 
 interface TreeVisualizerProps {
   data: CauseNode;
@@ -15,6 +16,13 @@ interface TreeVisualizerProps {
   onAddNode: (parentId: string) => void;
 }
 
+const getNodeTypeLabel = (node: CauseNode): string => {
+  if (node.type === NodeType.ISSUE) return 'Issue';
+  if (node.status === NodeStatus.CONFIRMED) return 'Confirmed Cause';
+  if (node.status === NodeStatus.RULED_OUT) return 'Ruled Out Potential Cause';
+  return 'Potential Cause';
+};
+
 export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   data,
   selectedId,
@@ -24,6 +32,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   onSelectNode,
   onAddNode
 }) => {
+  const { showAlert } = useAppDialog();
   const svgRef = useRef<SVGSVGElement>(null);
   const [transform, setTransform] = useState({ k: 1, x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -56,7 +65,9 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
 
     // Set tree layout settings
     const treeLayout = d3.tree<CauseNode>()
-      .nodeSize([CARD_WIDTH + 40, CARD_HEIGHT + 80]); // Spacing between nodes
+      .nodeSize([CARD_WIDTH + 40, CARD_HEIGHT + 80])
+      // Keep neighboring cards evenly spaced, including across subtree boundaries.
+      .separation(() => 1);
 
     treeLayout(root);
 
@@ -132,7 +143,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
       link.click();
     } catch (error) {
       console.error('Failed to export image:', error);
-      alert('Failed to export image. Please try again.');
+      await showAlert('Failed to export image. Please try again.', 'Export failed');
     } finally {
       setIsExporting(false);
     }
@@ -282,7 +293,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
 
                   <div className="flex justify-between items-center mt-2">
                      <span className="text-[10px] font-mono opacity-50 uppercase tracking-wider">
-                        {node.data.type}
+                        {getNodeTypeLabel(node.data)}
                      </span>
 
                      {/* Quick Add Child Button - visible on hover or selection */}

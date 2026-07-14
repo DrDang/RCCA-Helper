@@ -12,9 +12,11 @@ import { chooseJsonOpenFile, chooseJsonSaveFile, createProjectExportData, downlo
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
 import { SettingsModal } from './components/SettingsModal';
 import { ImportDialog } from './components/ImportDialog';
+import { useAppDialog } from './components/AppDialog';
 import { FolderOpen, GitBranch, LayoutDashboard, FileText, Settings, Moon, Sun, Shield, ClipboardList, PanelRightOpen, Save, Plus } from 'lucide-react';
 
 const App: React.FC = () => {
+  const { showAlert, showConfirm, showPrompt } = useAppDialog();
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [trees, setTrees] = useState<SavedTreeV2[]>([]);
@@ -210,10 +212,10 @@ const App: React.FC = () => {
         return;
       }
       console.error(err);
-      alert('Save failed. Please try Export from the project menu.');
+      await showAlert('Save failed. Please try Export from the project menu.', 'Save failed');
       setSaveStatus('idle');
     }
-  }, [activeProject, activeProjectId, activeTreeId, projects, trees]);
+  }, [activeProject, activeProjectId, activeTreeId, projects, trees, showAlert]);
 
   const loadWorkspaceFromJsonFile = useCallback(async (file: File, handle: FileSystemFileHandleLike | null = null) => {
     setOpenError(null);
@@ -414,11 +416,11 @@ const App: React.FC = () => {
   };
 
   // Delete a node with confirmation
-  const deleteNode = (nodeId: string) => {
+  const deleteNode = async (nodeId: string) => {
     if (!treeData) return;
 
     if (nodeId === treeData.id) {
-      alert("Cannot delete the root issue.");
+      await showAlert('The root issue cannot be deleted.', 'Cannot delete issue');
       return;
     }
 
@@ -428,7 +430,7 @@ const App: React.FC = () => {
       ? `Delete "${nodeToDelete?.label}" and its ${childCount} child node(s)?`
       : `Delete "${nodeToDelete?.label}"?`;
 
-    if (!window.confirm(message)) return;
+    if (!(await showConfirm(message, 'Confirm deletion', { confirmLabel: 'Delete', danger: true }))) return;
 
     const deleteRecursive = (node: CauseNode): CauseNode => {
       if (!node.children) return node;
@@ -547,14 +549,14 @@ const App: React.FC = () => {
     setCurrentView('tree');
   };
 
-  const handleCreateProject = () => {
-    const name = prompt('Project name:', 'New Project')?.trim();
+  const handleCreateProject = async () => {
+    const name = (await showPrompt('Project name:', 'New Project', 'Create project'))?.trim();
     if (!name) return;
     createProjectWithInitialInvestigation(name);
   };
-  const handleDeleteProject = (id: string) => {
+  const handleDeleteProject = async (id: string) => {
     if (projects.length <= 1) {
-      alert('Cannot delete the last project.');
+      await showAlert('The last project cannot be deleted.', 'Cannot delete project');
       return;
     }
     const project = projects.find(p => p.id === id);
@@ -562,7 +564,7 @@ const App: React.FC = () => {
     const message = treeCount > 0
       ? `Delete project "${project?.name}" and its ${treeCount} investigation(s)? This cannot be undone.`
       : `Delete project "${project?.name}"? This cannot be undone.`;
-    if (!window.confirm(message)) return;
+    if (!(await showConfirm(message, 'Confirm deletion', { confirmLabel: 'Delete', danger: true }))) return;
 
     setProjects(prev => prev.filter(p => p.id !== id));
     setTrees(prev => prev.filter(t => t.projectId !== id));
@@ -644,7 +646,7 @@ const App: React.FC = () => {
         setImportCandidates(result as SavedTree[]);
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to import file');
+      await showAlert(err instanceof Error ? err.message : 'Failed to import file', 'Import failed');
     }
   };
 
@@ -655,9 +657,9 @@ const App: React.FC = () => {
   }
 
   // Tree management handlers
-  const handleCreateTree = () => {
+  const handleCreateTree = async () => {
     if (!activeProjectId) return;
-    const name = prompt('Investigation name:', 'New Investigation');
+    const name = await showPrompt('Investigation name:', 'New Investigation', 'Create investigation');
     if (!name) return;
     const newTree: SavedTreeV2 = {
       id: crypto.randomUUID(),
@@ -675,9 +677,9 @@ const App: React.FC = () => {
     setSelectedNodeId(null);
   };
 
-  const handleDeleteTree = (id: string) => {
+  const handleDeleteTree = async (id: string) => {
     const tree = trees.find(t => t.id === id);
-    if (!window.confirm(`Delete investigation "${tree?.name}"? This cannot be undone.`)) return;
+    if (!(await showConfirm(`Delete investigation "${tree?.name}"? This cannot be undone.`, 'Delete investigation', { confirmLabel: 'Delete', danger: true }))) return;
     const remaining = trees.filter(t => t.id !== id);
     setTrees(remaining);
     if (activeTreeId === id) {
@@ -715,7 +717,7 @@ const App: React.FC = () => {
       const parsed = await parseImportFile(file);
       setImportCandidates(parsed);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to import file');
+      await showAlert(err instanceof Error ? err.message : 'Failed to import file', 'Import failed');
     }
   };
 

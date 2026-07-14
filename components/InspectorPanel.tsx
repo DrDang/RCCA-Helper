@@ -1,6 +1,7 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ActionItem, ActionUpdate, CauseNode, IssueStatus, Note, NodeStatus, NodeType, ResolutionItem, ResolutionStatus } from '../types';
 import { ISSUE_STATUS_COLORS, ISSUE_STATUS_LABELS, NODE_STATUS_LABELS, STATUS_COLORS, RESOLUTION_STATUS_COLORS } from '../constants';
+import { useAppDialog } from './AppDialog';
 import {
     ClipboardList,
     StickyNote,
@@ -126,6 +127,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   const [editingUpdateText, setEditingUpdateText] = useState('');
   const [isResizing, setIsResizing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const { showAlert, showConfirm } = useAppDialog();
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -149,6 +151,22 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   }, [width, onWidthChange]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (target instanceof Element && target.closest('[data-app-dialog]')) return;
+      if (panelRef.current && !panelRef.current.contains(target)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+  }, [isOpen, onClose]);
 
   if (!isOpen) {
     return null;
@@ -200,12 +218,12 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   // Filter resolutions linked to this node
   const nodeResolutions = resolutions.filter(r => r.linkedCauseIds.includes(selectedNode.id));
 
-  const handleStatusChange = (newStatus: NodeStatus) => {
+  const handleStatusChange = async (newStatus: NodeStatus) => {
     if (newStatus === NodeStatus.RULED_OUT) {
        // Check for evidence note
        const hasEvidence = nodeNotes.some(n => n.isEvidence);
        if (!hasEvidence) {
-           alert("Policy Violation: You cannot rule out a cause without attaching evidence. Please add a Note marked as Evidence first.");
+           await showAlert('You cannot rule out a potential cause without attaching evidence. Please add a note marked as Evidence first.', 'Evidence required');
            setActiveTab('notes');
            return;
        }
@@ -434,8 +452,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                 #{displayIndex}
                             </span>
                             <button
-                                onClick={() => {
-                                    if (window.confirm(`Delete action "${action.action}"? This cannot be undone.`)) {
+                                onClick={async () => {
+                                    if (await showConfirm(`Delete action "${action.action}"? This cannot be undone.`, 'Delete action', { confirmLabel: 'Delete', danger: true })) {
                                         onDeleteAction(action.id);
                                     }
                                 }}
@@ -830,8 +848,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                     {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        if (window.confirm(`Delete resolution "${resolution.title}"? This cannot be undone.`)) {
+                                    onClick={async () => {
+                                        if (await showConfirm(`Delete resolution "${resolution.title}"? This cannot be undone.`, 'Delete corrective action', { confirmLabel: 'Delete', danger: true })) {
                                             onDeleteResolution(resolution.id);
                                         }
                                     }}

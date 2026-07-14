@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActionUpdate, CauseNode, ResolutionItem, ResolutionStatus } from '../types';
 import { RESOLUTION_STATUS_COLORS } from '../constants';
+import { useAppDialog } from './AppDialog';
 import {
     Shield,
     Plus,
@@ -98,6 +99,7 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
   onNavigateToNode,
   onGenerateReport
 }) => {
+  const { showConfirm } = useAppDialog();
   const [statusFilter, setStatusFilter] = useState<ResolutionStatus | 'all'>('all');
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>('all');
   const [sortBy, setSortBy] = useState<'status' | 'targetDate'>('status');
@@ -494,8 +496,8 @@ export const ResolutionsSummary: React.FC<ResolutionsSummaryProps> = ({
                             </button>
                           )}
                           <button
-                            onClick={() => {
-                              if (window.confirm('Delete this update? This cannot be undone.')) {
+                            onClick={async () => {
+                              if (await showConfirm('Delete this update? This cannot be undone.', 'Delete update', { confirmLabel: 'Delete', danger: true })) {
                                 onUpdateResolution({ ...resolution, updates: (resolution.updates ?? []).filter(u => u.id !== update.id) });
                               }
                             }}

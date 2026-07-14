@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ActionItem, ActionUpdate, CauseNode } from '../types';
+import { useAppDialog } from './AppDialog';
 import {
     ClipboardList,
     Plus,
@@ -84,6 +85,7 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
   onNavigateToNode,
   onGenerateReport
 }) => {
+  const { showConfirm } = useAppDialog();
   const [statusFilter, setStatusFilter] = useState<ActionItem['status'] | 'all'>('all');
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>('all');
   const [sortBy, setSortBy] = useState<'status' | 'dueDate'>('status');
@@ -184,8 +186,8 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
               {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
             <button
-              onClick={() => {
-                if (window.confirm(`Delete action "${action.action}"? This cannot be undone.`)) {
+              onClick={async () => {
+                if (await showConfirm(`Delete action "${action.action}"? This cannot be undone.`, 'Delete action', { confirmLabel: 'Delete', danger: true })) {
                   onDeleteAction(action.id);
                 }
               }}
@@ -348,8 +350,8 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
                             </button>
                           )}
                           <button
-                            onClick={() => {
-                              if (window.confirm('Delete this update? This cannot be undone.')) {
+                            onClick={async () => {
+                              if (await showConfirm('Delete this update? This cannot be undone.', 'Delete update', { confirmLabel: 'Delete', danger: true })) {
                                 onUpdateAction({ ...action, updates: (action.updates ?? []).filter(u => u.id !== update.id) });
                               }
                             }}

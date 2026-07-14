@@ -7,6 +7,7 @@ import './index.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { AppDialogProvider } from './components/AppDialog';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -16,6 +17,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <AppDialogProvider>
+      <App />
+    </AppDialogProvider>
   </React.StrictMode>
 );
