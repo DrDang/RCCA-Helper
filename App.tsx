@@ -31,6 +31,7 @@ const App: React.FC = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [inspectorWidth, setInspectorWidth] = useState(450);
+  const [notesTabRequest, setNotesTabRequest] = useState(0);
   const [importCandidates, setImportCandidates] = useState<SavedTree[] | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [pendingNavigation, setPendingNavigation] = useState<null | (() => void)>(null);
@@ -1042,8 +1043,14 @@ const App: React.FC = () => {
                   selectedId={selectedNodeId}
                   actions={actions}
                   resolutions={resolutions}
+                  notes={notes}
                   treeName={activeTree?.name}
                   onSelectNode={(node) => { setSelectedNodeId(node.id); setInspectorOpen(true); }}
+                  onShowNodeNotes={(node) => {
+                    setSelectedNodeId(node.id);
+                    setInspectorOpen(true);
+                    setNotesTabRequest(request => request + 1);
+                  }}
                   onAddNode={addChildNode}
               />
           </div>
@@ -1067,6 +1074,7 @@ const App: React.FC = () => {
               onUpdateResolution={handleUpdateResolution}
               onDeleteResolution={handleDeleteResolution}
               isOpen={inspectorOpen}
+              notesTabRequest={notesTabRequest}
               onClose={() => setInspectorOpen(false)}
               width={inspectorWidth}
               onWidthChange={setInspectorWidth}

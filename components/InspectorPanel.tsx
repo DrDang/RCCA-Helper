@@ -92,6 +92,7 @@ interface InspectorPanelProps {
   onUpdateResolution: (resolution: ResolutionItem) => void;
   onDeleteResolution: (resolutionId: string) => void;
   isOpen: boolean;
+  notesTabRequest: number;
   onClose: () => void;
   width: number;
   onWidthChange: (width: number) => void;
@@ -115,6 +116,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   onUpdateResolution,
   onDeleteResolution,
   isOpen,
+  notesTabRequest,
   onClose,
   width,
   onWidthChange
@@ -131,6 +133,11 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   const [pendingRuledOutNodeId, setPendingRuledOutNodeId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const { showAlert, showConfirm } = useAppDialog();
+
+  // Evidence badges on the tree can request direct navigation to this tab.
+  useEffect(() => {
+    if (notesTabRequest > 0) setActiveTab('notes');
+  }, [notesTabRequest]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

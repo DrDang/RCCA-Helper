@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import html2canvas from 'html2canvas';
-import { CauseNode, ActionItem, IssueStatus, NodeStatus, NodeType, ResolutionItem } from '../types';
+import { CauseNode, ActionItem, IssueStatus, NodeStatus, NodeType, Note, ResolutionItem } from '../types';
 import { CARD_WIDTH, CARD_HEIGHT, getNodeStatusColors } from '../constants';
-import { Plus, Move, ClipboardList, Crosshair, Shield, Download } from 'lucide-react';
+import { Plus, Move, ClipboardList, Crosshair, Shield, Download, StickyNote, AlertTriangle } from 'lucide-react';
 import { useAppDialog } from './AppDialog';
 
 interface TreeVisualizerProps {
@@ -11,8 +11,10 @@ interface TreeVisualizerProps {
   selectedId: string | null;
   actions: ActionItem[];
   resolutions: ResolutionItem[];
+  notes: Note[];
   treeName?: string;
   onSelectNode: (node: CauseNode) => void;
+  onShowNodeNotes: (node: CauseNode) => void;
   onAddNode: (parentId: string) => void;
 }
 
@@ -29,8 +31,10 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   selectedId,
   actions,
   resolutions,
+  notes,
   treeName = 'fault-tree',
   onSelectNode,
+  onShowNodeNotes,
   onAddNode
 }) => {
   const { showAlert } = useAppDialog();
@@ -58,6 +62,18 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     }
     return set;
   }, [resolutions]);
+
+  // Group evidence notes by cause so ruled-out reasons are available from the tree.
+  const evidenceNotesByNode = useMemo(() => {
+    const map = new Map<string, Note[]>();
+    for (const note of notes) {
+      if (!note.isEvidence) continue;
+      const existing = map.get(note.referenceId) ?? [];
+      existing.push(note);
+      map.set(note.referenceId, existing);
+    }
+    return map;
+  }, [notes]);
 
   // Process data with D3
   const { nodes, links } = useMemo(() => {
@@ -276,6 +292,12 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             const hasActions = nodesWithActions.has(node.data.id);
             const hasResolutions = nodesWithResolutions.has(node.data.id);
             const isLeafRootCause = !isExcluded && node.data.isRootCause === true && (!node.data.children || node.data.children.length === 0);
+            const description = node.data.description.trim();
+            const isDirectlyRuledOut = !isExcluded && node.data.type !== NodeType.ISSUE && node.data.status === NodeStatus.RULED_OUT;
+            const evidenceNotes = evidenceNotesByNode.get(node.data.id) ?? [];
+            const evidenceNote = evidenceNotes.find(note => note.content.trim().length > 0);
+            const evidenceReason = evidenceNote?.content.trim() ?? '';
+            const hasEvidenceReason = evidenceReason.length > 0;
 
             return (
               <foreignObject
@@ -346,13 +368,67 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                     </div>
                   )}
 
+                  {/* Ruled-out evidence badge with quick reason preview */}
+                  {isDirectlyRuledOut && (
+                    <button
+                      type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onShowNodeNotes(node.data);
+                      }}
+                      className={`
+                        group/evidence absolute -bottom-2 left-3 z-20 flex h-6 w-6 items-center justify-center
+                        rounded-full border-2 border-white text-white shadow-md transition-transform
+                        hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1
+                        ${hasEvidenceReason ? 'bg-emerald-600 focus:ring-emerald-500' : 'bg-amber-500 focus:ring-amber-400'}
+                      `}
+                      aria-label={hasEvidenceReason
+                        ? `View ruled-out evidence: ${evidenceReason}`
+                        : 'View notes. No ruled-out reason has been entered.'}
+                    >
+                      {hasEvidenceReason ? <StickyNote size={12} /> : <AlertTriangle size={12} />}
+                      <span
+                        role="tooltip"
+                        className="
+                          pointer-events-none invisible absolute bottom-full left-0 z-50 mb-2 w-64
+                          rounded-lg border p-3 text-left opacity-0 shadow-xl transition-opacity
+                          group-hover/evidence:visible group-hover/evidence:opacity-100
+                          group-focus-visible/evidence:visible group-focus-visible/evidence:opacity-100
+                        "
+                        style={{
+                          backgroundColor: 'var(--color-surface-primary)',
+                          borderColor: hasEvidenceReason ? 'var(--color-status-ruled-out-border)' : 'var(--color-status-pending-border)',
+                          color: 'var(--color-text-secondary)',
+                        }}
+                      >
+                        <span className="block text-[10px] font-bold uppercase tracking-wider" style={{ color: hasEvidenceReason ? 'var(--color-status-ruled-out-text)' : 'var(--color-status-pending-text)' }}>
+                          {hasEvidenceReason ? 'Ruled-out evidence' : 'Reason missing'}
+                        </span>
+                        <span className="mt-1 block whitespace-normal text-xs font-normal leading-relaxed">
+                          {hasEvidenceReason ? evidenceReason : 'This cause is ruled out, but no evidence reason has been entered.'}
+                        </span>
+                        {evidenceNote && (
+                          <span className="mt-2 block text-[10px] font-normal" style={{ color: 'var(--color-text-muted)' }}>
+                            {evidenceNote.owner} · {evidenceNote.createdAt}
+                          </span>
+                        )}
+                        <span className="mt-2 block text-[10px] font-semibold text-indigo-500">
+                          Click to open Notes{evidenceNotes.length > 1 ? ` (${evidenceNotes.length} evidence notes)` : ''}
+                        </span>
+                      </span>
+                    </button>
+                  )}
+
                   <div className="min-h-0 flex-1 overflow-hidden">
                     <h3 className="font-bold text-sm leading-tight" style={{ wordBreak: 'break-word' }}>
                       {node.data.label}
                     </h3>
-                    <p className="text-xs opacity-80 mt-1 line-clamp-3">
-                      {node.data.description || 'No description provided.'}
-                    </p>
+                    {description && (
+                      <p className="text-xs opacity-80 mt-1 line-clamp-2">
+                        {description}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex justify-between items-center mt-2">
