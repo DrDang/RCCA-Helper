@@ -10,6 +10,7 @@ import { CauseNode, ActionItem, Note, IssueStatus, NodeStatus, NodeType, SavedTr
 import { createInitialTree } from './constants';
 import { chooseJsonOpenFile, chooseJsonSaveFile, createProjectExportData, downloadJson, FileSystemFileHandleLike, getProjectFileName, isDirectFileSaveSupported, saveAppState, exportTreeAsJson, exportAllTreesAsJson, parseImportFile, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS, exportProjectAsJson, parseProjectImportFile, ProjectImportData, writeJsonToFile } from './persistence';
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
+import { findRuledOutAncestor } from './treeUtils';
 import { SettingsModal } from './components/SettingsModal';
 import { ImportDialog } from './components/ImportDialog';
 import { useAppDialog } from './components/AppDialog';
@@ -873,7 +874,7 @@ const App: React.FC = () => {
             </div>
             <div className="whitespace-nowrap">
                 <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>RCCA Helper</h1>
-                <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>Root Cause Analysis & Action Tracking</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>Root Cause Corrective Action</p>
             </div>
         </div>
 
@@ -1050,6 +1051,7 @@ const App: React.FC = () => {
           {/* Right: Inspector */}
           <InspectorPanel
               selectedNode={getSelectedNode()}
+              ruledOutAncestor={selectedNodeId && treeData ? findRuledOutAncestor(treeData, selectedNodeId) : null}
               actions={actions}
               notes={notes}
               resolutions={resolutions}

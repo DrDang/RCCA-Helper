@@ -14,11 +14,13 @@ function statusBadge(status: string, colors: { bg: string; border: string; text:
   return `<span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:12px;font-weight:500;background:${colors.bg};color:${colors.text};border:1px solid ${colors.border}">${escapeHtml(status)}</span>`;
 }
 
-function renderTreeHierarchy(node: CauseNode, notes: { referenceId: string; content: string; isEvidence: boolean }[], depth: number = 0): string {
-  const colors = getReportNodeStatusColors(node);
+function renderTreeHierarchy(node: CauseNode, notes: { referenceId: string; content: string; isEvidence: boolean }[], depth: number = 0, ruledOutAncestor: CauseNode | null = null): string {
+  const isExcluded = ruledOutAncestor !== null;
+  const displayNode = isExcluded ? { ...node, status: NodeStatus.RULED_OUT, isRootCause: false } : node;
+  const colors = getReportNodeStatusColors(displayNode);
   const indent = depth * 24;
   const nodeNotes = notes.filter(n => n.referenceId === node.id);
-  const isLeafRootCause = node.isRootCause === true && (!node.children || node.children.length === 0);
+  const isLeafRootCause = !isExcluded && node.isRootCause === true && (!node.children || node.children.length === 0);
 
   let html = `
     <div style="margin-left:${indent}px;margin-bottom:12px;padding:10px 14px;border-left:3px solid ${colors.border};background:${colors.bg};border-radius:0 6px 6px 0">
@@ -26,7 +28,7 @@ function renderTreeHierarchy(node: CauseNode, notes: { referenceId: string; cont
         <span style="width:10px;height:10px;border-radius:50%;background:${colors.border};display:inline-block;flex-shrink:0"></span>
         <strong style="color:${colors.text}">${escapeHtml(node.label)}</strong>
         <span style="font-size:11px;color:#64748b;text-transform:uppercase">${escapeHtml(node.type)}</span>
-        ${statusBadge(getNodeStatusLabel(node), colors)}
+        ${statusBadge(isExcluded ? `Excluded by ${ruledOutAncestor.label}` : getNodeStatusLabel(node), colors)}
         ${isLeafRootCause ? '<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#f59e0b;color:#fff;margin-left:4px">ROOT CAUSE</span>' : ''}
       </div>`;
 
@@ -50,8 +52,9 @@ function renderTreeHierarchy(node: CauseNode, notes: { referenceId: string; cont
   html += `</div>`;
 
   if (node.children) {
+    const nextRuledOutAncestor = ruledOutAncestor ?? (node.status === NodeStatus.RULED_OUT ? node : null);
     for (const child of node.children) {
-      html += renderTreeHierarchy(child, notes, depth + 1);
+      html += renderTreeHierarchy(child, notes, depth + 1, nextRuledOutAncestor);
     }
   }
   return html;

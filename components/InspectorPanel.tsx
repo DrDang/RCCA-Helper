@@ -76,6 +76,7 @@ const getNextUniqueTitle = (prefix: string, existingTitles: string[]): string =>
 
 interface InspectorPanelProps {
   selectedNode: CauseNode | null;
+  ruledOutAncestor: CauseNode | null;
   actions: ActionItem[];
   notes: Note[];
   resolutions: ResolutionItem[];
@@ -98,6 +99,7 @@ interface InspectorPanelProps {
 
 export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   selectedNode,
+  ruledOutAncestor,
   actions,
   notes,
   resolutions,
@@ -126,6 +128,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null);
   const [editingUpdateText, setEditingUpdateText] = useState('');
   const [isResizing, setIsResizing] = useState(false);
+  const [pendingRuledOutNodeId, setPendingRuledOutNodeId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const { showAlert, showConfirm } = useAppDialog();
 
@@ -212,7 +215,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   // Check if this is a root cause node (for showing Resolutions tab)
   const isIssueNode = selectedNode.type === NodeType.ISSUE;
   const isLeafNode = !selectedNode.children || selectedNode.children.length === 0;
-  const canMarkRootCause = !isIssueNode && isLeafNode && selectedNode.status === NodeStatus.CONFIRMED;
+  const canMarkRootCause = !ruledOutAncestor && !isIssueNode && isLeafNode && selectedNode.status === NodeStatus.CONFIRMED;
   const isRootCauseNode = canMarkRootCause && selectedNode.isRootCause === true;
 
   // Filter resolutions linked to this node
@@ -223,11 +226,13 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
        // Check for evidence note
        const hasEvidence = nodeNotes.some(n => n.isEvidence);
        if (!hasEvidence) {
-           await showAlert('You cannot rule out a potential cause without attaching evidence. Please add a note marked as Evidence first.', 'Evidence required');
+           setPendingRuledOutNodeId(selectedNode.id);
+           await showAlert('Add a note and mark it as Evidence. The cause will be set to Ruled Out automatically once evidence is attached.', 'Evidence required');
            setActiveTab('notes');
            return;
        }
     }
+    setPendingRuledOutNodeId(current => current === selectedNode.id ? null : current);
     const updatedNode = { ...selectedNode, status: newStatus };
     if (newStatus !== NodeStatus.CONFIRMED) {
       updatedNode.isRootCause = false;
@@ -327,6 +332,19 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-4" style={{ backgroundColor: 'var(--color-surface-secondary)' }}>
 
+        {ruledOutAncestor && (
+          <div
+            className="mb-4 p-3 rounded-lg border flex items-start gap-2"
+            style={{ backgroundColor: 'var(--color-status-ruled-out-bg)', borderColor: 'var(--color-status-ruled-out-border)', color: 'var(--color-status-ruled-out-text)' }}
+          >
+            <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold">Excluded by “{ruledOutAncestor.label}”</p>
+              <p className="text-xs mt-0.5">This branch inherits the parent’s Ruled Out result. Its own status and evidence are preserved and will return if the parent is reopened.</p>
+            </div>
+          </div>
+        )}
+
         {/* DETAILS TAB */}
         {activeTab === 'details' && (
           <div className="space-y-6">
@@ -346,7 +364,14 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                   {isIssueNode ? 'Issue Lifecycle' : 'Investigation Status'}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                    {isIssueNode ? Object.values(IssueStatus).map((status) => (
+                    {ruledOutAncestor ? (
+                        <div
+                            className="col-span-2 p-3 rounded border text-center text-xs font-medium"
+                            style={{ backgroundColor: 'var(--color-status-ruled-out-bg)', borderColor: 'var(--color-status-ruled-out-border)', color: 'var(--color-status-ruled-out-text)' }}
+                        >
+                            Inherited: Excluded / Ruled Out
+                        </div>
+                    ) : isIssueNode ? Object.values(IssueStatus).map((status) => (
                         <button
                             key={status}
                             onClick={() => handleIssueStatusChange(status)}
@@ -712,6 +737,18 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
         {/* NOTES TAB */}
         {activeTab === 'notes' && (
              <div className="space-y-4">
+                {pendingRuledOutNodeId === selectedNode.id && (
+                    <div
+                        className="flex items-start gap-2 p-3 rounded-lg border text-sm"
+                        style={{ backgroundColor: 'var(--color-status-pending-bg)', borderColor: 'var(--color-status-pending-border)', color: 'var(--color-status-pending-text)' }}
+                    >
+                        <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                        <div>
+                            <p className="font-semibold">Ruled Out pending</p>
+                            <p className="text-xs mt-0.5">Add a note or mark an existing note as Evidence. The status will update automatically.</p>
+                        </div>
+                    </div>
+                )}
                 <div className="flex justify-between items-center">
                     <h3 className="text-sm font-bold" style={{ color: 'var(--color-text-secondary)' }}>Notes & Evidence</h3>
                     <button
@@ -758,6 +795,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                             const updated = {...note, isEvidence: e.target.checked};
                                             onDeleteNote(note.id);
                                             onAddNote(updated);
+                                            if (updated.isEvidence && pendingRuledOutNodeId === selectedNode.id) {
+                                                onUpdateNode({ ...selectedNode, status: NodeStatus.RULED_OUT, isRootCause: false });
+                                                setPendingRuledOutNodeId(null);
+                                            }
                                         }}
                                         className="rounded text-green-600 focus:ring-green-500"
                                     />

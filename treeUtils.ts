@@ -24,6 +24,30 @@ export function flattenTree(node: CauseNode): CauseNode[] {
   return result;
 }
 
+export function findRuledOutAncestor(root: CauseNode, targetId: string): CauseNode | null {
+  const visit = (node: CauseNode, ruledOutAncestor: CauseNode | null): CauseNode | null | undefined => {
+    if (node.id === targetId) return ruledOutAncestor;
+    const nextAncestor = node.status === NodeStatus.RULED_OUT ? node : ruledOutAncestor;
+    for (const child of node.children ?? []) {
+      const result = visit(child, nextAncestor);
+      if (result !== undefined) return result;
+    }
+    return undefined;
+  };
+
+  return visit(root, null) ?? null;
+}
+
+export function applyInheritedRuleOut(node: CauseNode, ruledOutAncestor: CauseNode | null = null): CauseNode {
+  const isExcluded = ruledOutAncestor !== null;
+  const nextAncestor = ruledOutAncestor ?? (node.status === NodeStatus.RULED_OUT ? node : null);
+  return {
+    ...node,
+    ...(isExcluded ? { status: NodeStatus.RULED_OUT, isRootCause: false } : {}),
+    children: node.children?.map(child => applyInheritedRuleOut(child, nextAncestor)),
+  };
+}
+
 export function countNodesByStatus(nodes: CauseNode[]): Record<NodeStatus, number> {
   const counts: Record<NodeStatus, number> = {
     [NodeStatus.PENDING]: 0,
@@ -69,7 +93,7 @@ export function countResolutionsByStatus(resolutions: ResolutionItem[]): Record<
 }
 
 export function getTreeStats(tree: SavedTree): TreeStats {
-  const allNodes = flattenTree(tree.treeData);
+  const allNodes = flattenTree(applyInheritedRuleOut(tree.treeData));
   const causeNodes = allNodes.filter(n => n.type !== NodeType.ISSUE);
   const resolutions = tree.resolutions ?? [];
   return {

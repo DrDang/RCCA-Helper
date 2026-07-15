@@ -16,7 +16,8 @@ interface TreeVisualizerProps {
   onAddNode: (parentId: string) => void;
 }
 
-const getNodeTypeLabel = (node: CauseNode): string => {
+const getNodeTypeLabel = (node: CauseNode, isExcluded: boolean = false): string => {
+  if (isExcluded) return 'Excluded by Ruled-Out Parent';
   if (node.type === NodeType.ISSUE) return 'Issue';
   if (node.status === NodeStatus.CONFIRMED) return 'Confirmed Cause';
   if (node.status === NodeStatus.RULED_OUT) return 'Ruled Out Potential Cause';
@@ -244,8 +245,12 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         <g transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
           {/* Links — colored by target node status */}
           {links.map((link) => {
-            const targetStatus = link.target.data.status;
-            const lineColor = getNodeStatusColors(link.target.data).border;
+            const isTargetExcluded = link.target.ancestors().slice(1).some(ancestor => ancestor.data.status === NodeStatus.RULED_OUT);
+            const displayTarget = isTargetExcluded
+              ? { ...link.target.data, status: NodeStatus.RULED_OUT, isRootCause: false }
+              : link.target.data;
+            const targetStatus = displayTarget.status;
+            const lineColor = getNodeStatusColors(displayTarget).border;
 
             return (
               <path
@@ -261,11 +266,16 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
 
           {/* Nodes */}
           {nodes.map((node) => {
-            const styles = getNodeStatusColors(node.data);
+            const ruledOutAncestor = node.ancestors().slice(1).find(ancestor => ancestor.data.status === NodeStatus.RULED_OUT);
+            const isExcluded = ruledOutAncestor !== undefined;
+            const displayNode = isExcluded
+              ? { ...node.data, status: NodeStatus.RULED_OUT, isRootCause: false }
+              : node.data;
+            const styles = getNodeStatusColors(displayNode);
             const isSelected = node.data.id === selectedId;
             const hasActions = nodesWithActions.has(node.data.id);
             const hasResolutions = nodesWithResolutions.has(node.data.id);
-            const isLeafRootCause = node.data.isRootCause === true && (!node.data.children || node.data.children.length === 0);
+            const isLeafRootCause = !isExcluded && node.data.isRootCause === true && (!node.data.children || node.data.children.length === 0);
 
             return (
               <foreignObject
@@ -289,6 +299,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                   style={{
                     backgroundColor: styles.bg,
                     borderColor: isSelected ? '#6366f1' : (isLeafRootCause ? '#f59e0b' : styles.border),
+                    borderStyle: isExcluded ? 'dashed' : 'solid',
                     color: styles.text,
                     boxShadow: isLeafRootCause ? '0 0 0 2px rgba(245,158,11,0.3)' : undefined,
                   }}
@@ -304,11 +315,11 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                             : node.data.status === IssueStatus.OPEN
                               ? 'bg-blue-500'
                               : 'bg-orange-500'
-                        : node.data.status === NodeStatus.CONFIRMED
+                        : displayNode.status === NodeStatus.CONFIRMED
                           ? 'bg-red-500'
-                          : node.data.status === NodeStatus.RULED_OUT
+                          : displayNode.status === NodeStatus.RULED_OUT
                             ? 'bg-green-500'
-                            : node.data.status === NodeStatus.ACTIVE
+                            : displayNode.status === NodeStatus.ACTIVE
                               ? 'bg-orange-500'
                               : 'bg-slate-300'
                     }`}
@@ -346,7 +357,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
 
                   <div className="flex justify-between items-center mt-2">
                      <span className="text-[10px] font-mono opacity-50 uppercase tracking-wider">
-                        {getNodeTypeLabel(node.data)}
+                        {getNodeTypeLabel(node.data, isExcluded)}
                      </span>
 
                      {/* Quick Add Child Button - visible on hover or selection */}
