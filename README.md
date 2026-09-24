@@ -35,6 +35,7 @@ These are lightweight UI previews included for GitHub presentation. The live app
 ## Core Capabilities
 
 - Interactive D3 fault tree visualization with pan, zoom, recentering, and PNG export
+- Drag a node’s grip onto another node to move its branch under that parent, with a preview and confirmation before applying the change
 - Node-level investigation workflow with `Pending`, `Active`, `Ruled Out`, and `Confirmed` statuses
 - Root-cause marking so confirmed causes can roll into resolution planning
 - Evidence-based notes and rationale capture directly on investigation nodes
@@ -54,6 +55,8 @@ These are lightweight UI previews included for GitHub presentation. The live app
 3. Mark causes as ruled out, active, confirmed, or explicit root causes as evidence develops.
 4. Attach investigation actions and corrective actions to the relevant causes.
 5. Export project data, PNG tree views, or generated reports for circulation and recordkeeping.
+
+To change a parent in the graph, drag the grip at the bottom-left of a cause card onto the desired parent. A highlighted card shows the proposed target; release and choose **Move branch** to confirm. The entire branch moves, keeping its notes and linked actions. Dragging the card body or background still pans the graph. Small pointer movements do not start a move; dropping on empty space, pressing Esc, or cancelling the confirmation leaves relationships unchanged. The root issue cannot be moved, and moves onto the same node, its descendants, or its current parent are blocked.
 
 ## Run Locally
 

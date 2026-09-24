@@ -23,6 +23,17 @@ npm run build
 
 This refreshes the checked-in `dist/` output used by the double-click launchers.
 
+### Tree Relationship Checks
+
+Run the reparenting regression tests with the esbuild binary included in the development dependencies:
+
+```bash
+./node_modules/.bin/esbuild tests/treeUtils.test.ts --bundle --platform=node --format=esm --outfile=/tmp/rcca-tree-utils.test.mjs
+node --test /tmp/rcca-tree-utils.test.mjs
+```
+
+For graph changes, also verify dragging a grip to a valid parent, cancelling and confirming the move, invalid descendant/current-parent drops, dropping on empty space, and normal card/background panning at different zoom levels.
+
 ## Before Opening A PR
 
 - keep changes focused on one improvement or fix

@@ -10,7 +10,7 @@ import { CauseNode, ActionItem, Note, IssueStatus, NodeStatus, NodeType, SavedTr
 import { createInitialTree } from './constants';
 import { chooseJsonOpenFile, chooseJsonSaveFile, createProjectExportData, downloadJson, FileSystemFileHandleLike, getProjectFileName, isDirectFileSaveSupported, saveAppState, exportTreeAsJson, exportAllTreesAsJson, parseImportFile, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS, exportProjectAsJson, parseProjectImportFile, ProjectImportData, writeJsonToFile } from './persistence';
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
-import { findRuledOutAncestor } from './treeUtils';
+import { findRuledOutAncestor, getReparentError, reparentNode } from './treeUtils';
 import { SettingsModal } from './components/SettingsModal';
 import { ImportDialog } from './components/ImportDialog';
 import { useAppDialog } from './components/AppDialog';
@@ -416,6 +416,25 @@ const App: React.FC = () => {
       treeData: addRecursive(tree.treeData)
     }));
     setSelectedNodeId(newNode.id);
+  };
+
+  const handleReparentNode = async (nodeId: string, parentId: string) => {
+    if (!treeData || getReparentError(treeData, nodeId, parentId)) return;
+    const node = findNode(treeData, nodeId)!;
+    const parent = findNode(treeData, parentId)!;
+    const previousParent = findNode(treeData, node.parentId ?? '');
+    const excluded = parent.status === NodeStatus.RULED_OUT || findRuledOutAncestor(treeData, parentId);
+    const message = `Move "${node.label}"${node.children?.length ? ' and all its descendants' : ''} from "${previousParent?.label ?? 'its current parent'}" to become a child of "${parent.label}"? Notes and linked actions will stay attached.`
+      + (excluded ? ' This branch will be excluded by its ruled-out parent.' : '')
+      + (parent.isRootCause ? ' The new parent will no longer be marked as a root cause because it will have children.' : '');
+    if (!(await showConfirm(message, 'Change parent?', { confirmLabel: 'Move branch' }))) return;
+
+    // Revalidate against the same investigation and tree that were reviewed.
+    setTrees(previous => previous.map(tree => {
+      if (tree.id !== activeTreeId || tree.treeData !== treeData) return tree;
+      const next = reparentNode(tree.treeData, nodeId, parentId);
+      return next === tree.treeData ? tree : { ...tree, treeData: next, updatedAt: new Date().toISOString() };
+    }));
   };
 
   // Delete a node with confirmation
@@ -1039,6 +1058,7 @@ const App: React.FC = () => {
           {/* Left: Visualization */}
           <div className="flex-1 h-full relative">
               <TreeVisualizer
+                  key={activeTreeId}
                   data={treeData}
                   selectedId={selectedNodeId}
                   actions={actions}
@@ -1052,6 +1072,7 @@ const App: React.FC = () => {
                     setNotesTabRequest(request => request + 1);
                   }}
                   onAddNode={addChildNode}
+                  onReparentNode={handleReparentNode}
               />
           </div>
 

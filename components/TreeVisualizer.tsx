@@ -3,8 +3,9 @@ import * as d3 from 'd3';
 import html2canvas from 'html2canvas';
 import { CauseNode, ActionItem, IssueStatus, NodeStatus, NodeType, Note, ResolutionItem } from '../types';
 import { CARD_WIDTH, CARD_HEIGHT, getNodeStatusColors } from '../constants';
-import { Plus, Move, ClipboardList, Crosshair, Shield, Download, StickyNote, AlertTriangle } from 'lucide-react';
+import { Plus, Move, GripVertical, ClipboardList, Crosshair, Shield, Download, StickyNote, AlertTriangle } from 'lucide-react';
 import { useAppDialog } from './AppDialog';
+import { getReparentError } from '../treeUtils';
 
 interface TreeVisualizerProps {
   data: CauseNode;
@@ -16,6 +17,21 @@ interface TreeVisualizerProps {
   onSelectNode: (node: CauseNode) => void;
   onShowNodeNotes: (node: CauseNode) => void;
   onAddNode: (parentId: string) => void;
+  onReparentNode: (nodeId: string, parentId: string) => Promise<void>;
+}
+
+interface NodeDrag {
+  nodeId: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+  offsetX: number;
+  offsetY: number;
+  active: boolean;
+  targetId: string | null;
+  error: string | null;
 }
 
 const getNodeTypeLabel = (node: CauseNode, isExcluded: boolean = false): string => {
@@ -35,13 +51,38 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   treeName = 'fault-tree',
   onSelectNode,
   onShowNodeNotes,
-  onAddNode
+  onAddNode,
+  onReparentNode
 }) => {
   const { showAlert } = useAppDialog();
   const svgRef = useRef<SVGSVGElement>(null);
   const [transform, setTransform] = useState({ k: 1, x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const dragRef = useRef<NodeDrag | null>(null);
+  const [drag, setDrag] = useState<NodeDrag | null>(null);
+  const confirmingRef = useRef(false);
+
+  const cancelDrag = () => {
+    dragRef.current = null;
+    setDrag(null);
+  };
+
+  useEffect(() => {
+    cancelDrag();
+  }, [data]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cancelDrag();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('blur', cancelDrag);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('blur', cancelDrag);
+    };
+  }, []);
 
   // Build a set of node IDs that have actions for quick lookup
   const nodesWithActions = useMemo(() => {
@@ -100,6 +141,10 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
 
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 2])
+      .clickDistance(8)
+      .filter((event) => !dragRef.current && !confirmingRef.current
+        && !(event.target as Element).closest('[data-node-drag-handle]')
+        && (!event.ctrlKey || event.type === 'wheel') && !event.button)
       .on('zoom', (event) => {
         setTransform(event.transform);
       });
@@ -115,7 +160,61 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         d3.select(svgRef.current).call(zoom.transform, d3.zoomIdentity.translate(initialX, initialY).scale(0.8));
     }
 
+    return () => { d3.select(svgRef.current).on('.zoom', null); };
   }, []); // Run once on mount
+
+  const graphPoint = (event: React.PointerEvent) => {
+    const svg = svgRef.current!;
+    const point = d3.pointer(event.nativeEvent, svg);
+    return d3.zoomTransform(svg).invert(point);
+  };
+
+  const startDrag = (event: React.PointerEvent<HTMLButtonElement>, node: d3.HierarchyPointNode<CauseNode>) => {
+    event.stopPropagation();
+    if (event.button !== 0 || !event.isPrimary || confirmingRef.current || dragRef.current) return;
+    event.preventDefault();
+    d3.select(svgRef.current).interrupt();
+    const [x, y] = graphPoint(event);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      nodeId: node.data.id, pointerId: event.pointerId,
+      startX: event.clientX, startY: event.clientY,
+      x: node.x, y: node.y, offsetX: x - node.x, offsetY: y - node.y,
+      active: false, targetId: null, error: null,
+    };
+  };
+
+  const updateDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const current = dragRef.current;
+    if (!current || current.pointerId !== event.pointerId) return null;
+    event.stopPropagation();
+    const active = current.active || Math.hypot(event.clientX - current.startX, event.clientY - current.startY) >= 8;
+    const [x, y] = graphPoint(event);
+    // Hit-test the card under the pointer, accounting for zoom, pan and overlays.
+    const element = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-tree-node-id]');
+    const targetId = element && svgRef.current?.contains(element) ? element.getAttribute('data-tree-node-id') : null;
+    const next = {
+      ...current, active, x: x - current.offsetX, y: y - current.offsetY, targetId,
+      error: targetId ? getReparentError(data, current.nodeId, targetId) : null,
+    };
+    dragRef.current = next;
+    setDrag(next);
+    return next;
+  };
+
+  const finishDrag = async (event: React.PointerEvent<HTMLButtonElement>) => {
+    const current = updateDrag(event);
+    if (!current) return;
+    cancelDrag();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (!current.active || !current.targetId || current.error) return;
+    confirmingRef.current = true;
+    try {
+      await onReparentNode(current.nodeId, current.targetId);
+    } finally {
+      confirmingRef.current = false;
+    }
+  };
 
   // Keep the selected card visible when the inspector opens or changes width.
   useEffect(() => {
@@ -234,7 +333,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-hidden relative cursor-move" style={{ backgroundColor: 'var(--color-surface-secondary)' }}>
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
+      <div className="absolute top-4 left-4 z-10 flex flex-wrap gap-2">
         <div className="backdrop-blur p-2 rounded shadow text-xs" style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-tertiary)', opacity: 0.8 }}>
           <div className="flex items-center gap-2"><Move size={14} /> Pan & Zoom</div>
         </div>
@@ -256,6 +355,21 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
           <Download size={14} /> {isExporting ? 'Exporting...' : 'Export Image'}
         </button>
       </div>
+
+      {!drag?.active && (
+        <div className="absolute bottom-4 left-4 right-4 z-10 pointer-events-none text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+          Drag a node’s grip onto a new parent, then confirm. Esc cancels.
+        </div>
+      )}
+
+      {drag?.active && (
+        <div role="status" aria-live="polite" className="absolute bottom-4 left-4 right-4 z-20 rounded-lg border p-3 text-sm shadow-lg pointer-events-none"
+          style={{ backgroundColor: 'var(--color-surface-primary)', color: 'var(--color-text-primary)', borderColor: drag.error ? '#ef4444' : '#6366f1' }}>
+          {drag.error ?? (drag.targetId
+            ? `Release to review moving under “${nodes.find(node => node.data.id === drag.targetId)?.data.label}”.`
+            : 'Point at a new parent to move this branch. Drop on empty space or press Esc to cancel.')}
+        </div>
+      )}
 
       <svg ref={svgRef} className="w-full h-full">
         <g transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
@@ -298,6 +412,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             const evidenceNote = evidenceNotes.find(note => note.content.trim().length > 0);
             const evidenceReason = evidenceNote?.content.trim() ?? '';
             const hasEvidenceReason = evidenceReason.length > 0;
+            const isDropTarget = drag?.active && drag.targetId === node.data.id;
 
             return (
               <foreignObject
@@ -309,6 +424,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                 className="overflow-visible"
               >
                 <div
+                  data-tree-node-id={node.data.id}
                   onClick={(e) => {
                     e.stopPropagation();
                     onSelectNode(node.data);
@@ -323,7 +439,8 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                     borderColor: isSelected ? '#6366f1' : (isLeafRootCause ? '#f59e0b' : styles.border),
                     borderStyle: isExcluded ? 'dashed' : 'solid',
                     color: styles.text,
-                    boxShadow: isLeafRootCause ? '0 0 0 2px rgba(245,158,11,0.3)' : undefined,
+                    boxShadow: isDropTarget ? `0 0 0 5px ${drag.error ? '#ef4444' : '#6366f1'}` : isLeafRootCause ? '0 0 0 2px rgba(245,158,11,0.3)' : undefined,
+                    opacity: drag?.active && drag.nodeId === node.data.id ? 0.5 : 1,
                   }}
                 >
                   {/* Status Indicator Dot */}
@@ -410,7 +527,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                         </span>
                         {evidenceNote && (
                           <span className="mt-2 block text-[10px] font-normal" style={{ color: 'var(--color-text-muted)' }}>
-                            {evidenceNote.owner} � {evidenceNote.createdAt}
+                            {evidenceNote.owner} • {evidenceNote.createdAt}
                           </span>
                         )}
                         <span className="mt-2 block text-[10px] font-semibold text-indigo-500">
@@ -432,6 +549,24 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                   </div>
 
                   <div className="flex justify-between items-center mt-2">
+                     {node.parent && (
+                       <button
+                         type="button"
+                         data-node-drag-handle
+                         aria-label={`Move ${node.data.label} to a new parent`}
+                         title="Drag to a new parent; release to review the move"
+                         className="mr-1 shrink-0 rounded p-1 cursor-grab active:cursor-grabbing hover:bg-black/10 focus-visible:ring-2 focus-visible:ring-indigo-500"
+                         style={{ touchAction: 'none' }}
+                         onPointerDown={(event) => startDrag(event, node)}
+                         onPointerMove={updateDrag}
+                         onPointerUp={(event) => void finishDrag(event)}
+                         onPointerCancel={cancelDrag}
+                         onLostPointerCapture={cancelDrag}
+                         onClick={(event) => event.stopPropagation()}
+                       >
+                         <GripVertical size={18} />
+                       </button>
+                     )}
                      <span className="text-[10px] font-mono opacity-50 uppercase tracking-wider">
                         {getNodeTypeLabel(node.data, isExcluded)}
                      </span>
@@ -472,6 +607,15 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
               </foreignObject>
             );
           })}
+          {drag?.active && (
+            <g pointerEvents="none" aria-hidden="true">
+              <rect x={drag.x} y={drag.y} width={CARD_WIDTH} height={CARD_HEIGHT} rx={8}
+                fill="var(--color-surface-primary)" fillOpacity={0.8} stroke="#6366f1" strokeWidth={3} strokeDasharray="8 4" />
+              <text x={drag.x + 12} y={drag.y + 26} fill="var(--color-text-primary)" fontSize={13}>
+                Moving branch…
+              </text>
+            </g>
+          )}
         </g>
       </svg>
     </div>

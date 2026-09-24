@@ -24,6 +24,33 @@ export function flattenTree(node: CauseNode): CauseNode[] {
   return result;
 }
 
+export function getReparentError(root: CauseNode, nodeId: string, parentId: string): string | null {
+  const nodes = flattenTree(root);
+  const node = nodes.find(item => item.id === nodeId);
+  const parent = nodes.find(item => item.id === parentId);
+  if (!node || !parent) return 'This node is no longer in the tree.';
+  if (node.id === root.id) return 'The root issue cannot be moved.';
+  if (node.id === parent.id) return 'A node cannot be its own parent.';
+  if (flattenTree(node).some(item => item.id === parentId)) return 'A node cannot move under its own descendant.';
+  if (parent.children?.some(item => item.id === nodeId)) return 'This node is already a child of that parent.';
+  return null;
+}
+
+// Move the original subtree without changing IDs or the records linked to them.
+export function reparentNode(root: CauseNode, nodeId: string, parentId: string): CauseNode {
+  if (getReparentError(root, nodeId, parentId)) return root;
+  const node = flattenTree(root).find(item => item.id === nodeId)!;
+  const moved = { ...node, parentId };
+  const visit = (current: CauseNode): CauseNode => {
+    const children = current.children?.filter(child => child.id !== nodeId).map(visit);
+    if (current.id === parentId) {
+      return { ...current, isRootCause: false, children: [...(children ?? []), moved] };
+    }
+    return children ? { ...current, children } : current;
+  };
+  return visit(root);
+}
+
 export function findRuledOutAncestor(root: CauseNode, targetId: string): CauseNode | null {
   const visit = (node: CauseNode, ruledOutAncestor: CauseNode | null): CauseNode | null | undefined => {
     if (node.id === targetId) return ruledOutAncestor;
