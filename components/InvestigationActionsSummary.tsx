@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { ActionItem, ActionUpdate, CauseNode } from '../types';
 import { useAppDialog } from './AppDialog';
+import { AssigneeInput } from './AssigneeInput';
+import { getLocalDate, isActionOverdue } from '../actionUtils';
 import {
     ClipboardList,
     Plus,
     Calendar,
     User,
     XCircle,
-    ChevronDown,
-    ChevronUp,
     Filter,
     AlertTriangle,
     FileText,
@@ -44,28 +44,19 @@ const ACTION_STATUS_COLORS: Record<string, { bg: string; border: string; text: s
 
 type DueDateFilter = 'all' | 'overdue' | 'due-today' | 'due-this-week' | 'no-date';
 
-const isOverdue = (dueDate: string, status: string) => {
-  if (!dueDate || status === 'Complete' || status === 'Closed') return false;
-  return new Date(dueDate) < new Date(new Date().toDateString());
-};
-
-const isDueToday = (dueDate: string) => {
-  if (!dueDate) return false;
-  const today = new Date().toDateString();
-  return new Date(dueDate).toDateString() === today;
-};
+const isDueToday = (dueDate: string) => dueDate === getLocalDate();
 
 const isDueThisWeek = (dueDate: string) => {
   if (!dueDate) return false;
   const today = new Date();
   const endOfWeek = new Date(today);
   endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
-  const due = new Date(dueDate);
-  return due >= new Date(today.toDateString()) && due <= endOfWeek;
+  return dueDate >= getLocalDate(today) && dueDate <= getLocalDate(endOfWeek);
 };
 
 interface InvestigationActionsSummaryProps {
   actions: ActionItem[];
+  assigneeNames: string[];
   allNodes: CauseNode[];
   treeName: string;
   onAddAction: (action: ActionItem) => void;
@@ -77,6 +68,7 @@ interface InvestigationActionsSummaryProps {
 
 export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryProps> = ({
   actions,
+  assigneeNames,
   allNodes,
   treeName,
   onAddAction,
@@ -90,7 +82,6 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>('all');
   const [sortBy, setSortBy] = useState<'status' | 'dueDate'>('status');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [expandedActionUpdates, setExpandedActionUpdates] = useState<Record<string, boolean>>({});
   const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
   const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null);
@@ -100,7 +91,7 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
     .filter(a => statusFilter === 'all' || a.status === statusFilter)
     .filter(a => {
       if (dueDateFilter === 'all') return true;
-      if (dueDateFilter === 'overdue') return isOverdue(a.dueDate, a.status);
+      if (dueDateFilter === 'overdue') return isActionOverdue(a.dueDate, a.status);
       if (dueDateFilter === 'due-today') return isDueToday(a.dueDate);
       if (dueDateFilter === 'due-this-week') return isDueThisWeek(a.dueDate);
       if (dueDateFilter === 'no-date') return !a.dueDate;
@@ -125,10 +116,7 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
     return acc;
   }, {} as Record<string, number>);
 
-  const overdueCount = actions.filter(a => {
-    if (!a.dueDate || a.status === 'Complete' || a.status === 'Closed') return false;
-    return new Date(a.dueDate) < new Date();
-  }).length;
+  const overdueCount = actions.filter(a => isActionOverdue(a.dueDate, a.status)).length;
 
   const getNodeLabel = (causeId: string) => {
     const node = allNodes.find(n => n.id === causeId);
@@ -137,11 +125,7 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
 
   const renderActionCard = (action: ActionItem) => {
     const colors = ACTION_STATUS_COLORS[action.status] ?? ACTION_STATUS_COLORS['Open'];
-    const isExpanded = expandedActionId === action.id;
-    const isOverdue = action.dueDate &&
-                      new Date(action.dueDate) < new Date() &&
-                      action.status !== 'Complete' &&
-                      action.status !== 'Closed';
+    const isOverdue = isActionOverdue(action.dueDate, action.status);
 
     return (
       <div
@@ -179,13 +163,6 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
               {ACTION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <button
-              onClick={() => setExpandedActionId(isExpanded ? null : action.id)}
-              className="p-1.5 rounded hover:bg-black/10"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
-            <button
               onClick={async () => {
                 if (await showConfirm(`Delete action "${action.action}"? This cannot be undone.`, 'Delete action', { confirmLabel: 'Delete', danger: true })) {
                   onDeleteAction(action.id);
@@ -203,18 +180,17 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
         <div className="flex flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-1.5" style={{ color: 'var(--color-text-tertiary)' }}>
             <User size={14} />
-            <input
-              className="bg-transparent outline-none"
-              style={{ color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-primary)' }}
+            <AssigneeInput
               value={action.assignee}
-              onChange={(e) => onUpdateAction({...action, assignee: e.target.value})}
-              placeholder="Assignee"
+              names={assigneeNames}
+              onChange={assignee => onUpdateAction({...action, assignee})}
             />
           </div>
           <div className="flex items-center gap-1.5" style={{ color: 'var(--color-text-tertiary)' }}>
             <Calendar size={14} />
             <input
               type="date"
+              aria-label="Due date"
               className="bg-transparent outline-none"
               style={{ color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border-primary)' }}
               value={action.dueDate}
@@ -249,145 +225,142 @@ export const InvestigationActionsSummary: React.FC<InvestigationActionsSummaryPr
           </button>
         </div>
 
-        {/* Expanded content */}
-        {isExpanded && (
-          <div className="mt-4 pt-4 space-y-4" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
-            {/* Updates / Activity Log */}
-            <div className="pt-3" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
-              <button
-                onClick={() => setExpandedActionUpdates(prev => ({ ...prev, [action.id]: !prev[action.id] }))}
-                className="flex items-center gap-1 text-xs uppercase tracking-wider font-semibold w-full"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                <ChevronRight
-                  size={14}
-                  className={`transition-transform ${expandedActionUpdates[action.id] ? 'rotate-90' : ''}`}
-                />
-                Updates ({(action.updates ?? []).length})
-              </button>
+        {/* Updates / Activity Log */}
+        <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
+          <button
+            onClick={() => setExpandedActionUpdates(prev => ({ ...prev, [action.id]: !prev[action.id] }))}
+            aria-expanded={!!expandedActionUpdates[action.id]}
+            aria-controls={`action-updates-${action.id}`}
+            className="flex items-center gap-1 text-xs uppercase tracking-wider font-semibold w-full"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
+            <ChevronRight
+              size={14}
+              className={`transition-transform ${expandedActionUpdates[action.id] ? 'rotate-90' : ''}`}
+            />
+            Updates ({(action.updates ?? []).length})
+          </button>
 
-              {expandedActionUpdates[action.id] && (
-                <div className="mt-3 space-y-2">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Add update..."
-                      className="flex-1 text-sm p-2 rounded"
-                      style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-secondary)', color: 'var(--color-text-primary)' }}
-                      value={newUpdateText[action.id] ?? ''}
-                      onChange={(e) => setNewUpdateText(prev => ({ ...prev, [action.id]: e.target.value }))}
+          {expandedActionUpdates[action.id] && (
+            <div id={`action-updates-${action.id}`} className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Add update..."
+                  className="flex-1 min-w-0 text-sm p-2 rounded"
+                  style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-secondary)', color: 'var(--color-text-primary)' }}
+                  value={newUpdateText[action.id] ?? ''}
+                  onChange={(e) => setNewUpdateText(prev => ({ ...prev, [action.id]: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (newUpdateText[action.id] ?? '').trim()) {
+                      const update: ActionUpdate = {
+                        id: crypto.randomUUID(),
+                        content: (newUpdateText[action.id] ?? '').trim(),
+                        createdAt: new Date().toISOString(),
+                      };
+                      onUpdateAction({ ...action, updates: [...(action.updates ?? []), update] });
+                      setNewUpdateText(prev => ({ ...prev, [action.id]: '' }));
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (!(newUpdateText[action.id] ?? '').trim()) return;
+                    const update: ActionUpdate = {
+                      id: crypto.randomUUID(),
+                      content: (newUpdateText[action.id] ?? '').trim(),
+                      createdAt: new Date().toISOString(),
+                    };
+                    onUpdateAction({ ...action, updates: [...(action.updates ?? []), update] });
+                    setNewUpdateText(prev => ({ ...prev, [action.id]: '' }));
+                  }}
+                  className="px-3 py-2 rounded text-sm"
+                  style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-secondary)', color: 'var(--color-text-secondary)' }}
+                  title="Add update"
+                >
+                  <MessageSquarePlus size={16} />
+                </button>
+              </div>
+              {(action.updates ?? []).length === 0 && (
+                <p className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>No updates yet.</p>
+              )}
+              {[...(action.updates ?? [])].reverse().map(update => (
+                <div key={update.id} className="text-sm p-3 rounded" style={{ backgroundColor: 'var(--color-surface-primary)' }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                      {new Date(update.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {editingUpdateId === update.id ? (
+                        <button
+                          onClick={() => {
+                            if (editingUpdateText.trim()) {
+                              onUpdateAction({
+                                ...action,
+                                updates: (action.updates ?? []).map(u =>
+                                  u.id === update.id ? { ...u, content: editingUpdateText.trim() } : u
+                                )
+                              });
+                            }
+                            setEditingUpdateId(null);
+                            setEditingUpdateText('');
+                          }}
+                          className="hover:text-green-500"
+                          style={{ color: 'var(--color-text-muted)' }}
+                          title="Save"
+                        >
+                          <Check size={12} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setEditingUpdateId(update.id);
+                            setEditingUpdateText(update.content);
+                          }}
+                          className="hover:text-indigo-500"
+                          style={{ color: 'var(--color-text-muted)' }}
+                          title="Edit update"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      )}
+                      <button
+                        onClick={async () => {
+                          if (await showConfirm('Delete this update? This cannot be undone.', 'Delete update', { confirmLabel: 'Delete', danger: true })) {
+                            onUpdateAction({ ...action, updates: (action.updates ?? []).filter(u => u.id !== update.id) });
+                          }
+                        }}
+                        className="hover:text-red-400"
+                        style={{ color: 'var(--color-text-muted)' }}
+                        title="Delete update"
+                      >
+                        <XCircle size={12} />
+                      </button>
+                    </div>
+                  </div>
+                  {editingUpdateId === update.id ? (
+                    <textarea
+                      value={editingUpdateText}
+                      onChange={(e) => setEditingUpdateText(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (newUpdateText[action.id] ?? '').trim()) {
-                          const update: ActionUpdate = {
-                            id: crypto.randomUUID(),
-                            content: (newUpdateText[action.id] ?? '').trim(),
-                            createdAt: new Date().toISOString(),
-                          };
-                          onUpdateAction({ ...action, updates: [...(action.updates ?? []), update] });
-                          setNewUpdateText(prev => ({ ...prev, [action.id]: '' }));
+                        if (e.key === 'Escape') {
+                          setEditingUpdateId(null);
+                          setEditingUpdateText('');
                         }
                       }}
+                      className="w-full p-2 text-sm rounded border resize-none"
+                      style={{ backgroundColor: 'var(--color-surface-secondary)', color: 'var(--color-text-primary)', borderColor: 'var(--color-border-primary)' }}
+                      rows={2}
+                      autoFocus
                     />
-                    <button
-                      onClick={() => {
-                        if (!(newUpdateText[action.id] ?? '').trim()) return;
-                        const update: ActionUpdate = {
-                          id: crypto.randomUUID(),
-                          content: (newUpdateText[action.id] ?? '').trim(),
-                          createdAt: new Date().toISOString(),
-                        };
-                        onUpdateAction({ ...action, updates: [...(action.updates ?? []), update] });
-                        setNewUpdateText(prev => ({ ...prev, [action.id]: '' }));
-                      }}
-                      className="px-3 py-2 rounded text-sm"
-                      style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-secondary)', color: 'var(--color-text-secondary)' }}
-                      title="Add update"
-                    >
-                      <MessageSquarePlus size={16} />
-                    </button>
-                  </div>
-                  {(action.updates ?? []).length === 0 && (
-                    <p className="text-xs italic" style={{ color: 'var(--color-text-muted)' }}>No updates yet.</p>
+                  ) : (
+                    <p style={{ color: 'var(--color-text-secondary)' }}>{update.content}</p>
                   )}
-                  {[...(action.updates ?? [])].reverse().map(update => (
-                    <div key={update.id} className="text-sm p-3 rounded" style={{ backgroundColor: 'var(--color-surface-primary)' }}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>
-                          {new Date(update.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {editingUpdateId === update.id ? (
-                            <button
-                              onClick={() => {
-                                if (editingUpdateText.trim()) {
-                                  onUpdateAction({
-                                    ...action,
-                                    updates: (action.updates ?? []).map(u =>
-                                      u.id === update.id ? { ...u, content: editingUpdateText.trim() } : u
-                                    )
-                                  });
-                                }
-                                setEditingUpdateId(null);
-                                setEditingUpdateText('');
-                              }}
-                              className="hover:text-green-500"
-                              style={{ color: 'var(--color-text-muted)' }}
-                              title="Save"
-                            >
-                              <Check size={12} />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setEditingUpdateId(update.id);
-                                setEditingUpdateText(update.content);
-                              }}
-                              className="hover:text-indigo-500"
-                              style={{ color: 'var(--color-text-muted)' }}
-                              title="Edit update"
-                            >
-                              <Pencil size={12} />
-                            </button>
-                          )}
-                          <button
-                            onClick={async () => {
-                              if (await showConfirm('Delete this update? This cannot be undone.', 'Delete update', { confirmLabel: 'Delete', danger: true })) {
-                                onUpdateAction({ ...action, updates: (action.updates ?? []).filter(u => u.id !== update.id) });
-                              }
-                            }}
-                            className="hover:text-red-400"
-                            style={{ color: 'var(--color-text-muted)' }}
-                            title="Delete update"
-                          >
-                            <XCircle size={12} />
-                          </button>
-                        </div>
-                      </div>
-                      {editingUpdateId === update.id ? (
-                        <textarea
-                          value={editingUpdateText}
-                          onChange={(e) => setEditingUpdateText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Escape') {
-                              setEditingUpdateId(null);
-                              setEditingUpdateText('');
-                            }
-                          }}
-                          className="w-full p-2 text-sm rounded border resize-none"
-                          style={{ backgroundColor: 'var(--color-surface-secondary)', color: 'var(--color-text-primary)', borderColor: 'var(--color-border-primary)' }}
-                          rows={2}
-                          autoFocus
-                        />
-                      ) : (
-                        <p style={{ color: 'var(--color-text-secondary)' }}>{update.content}</p>
-                      )}
-                    </div>
-                  ))}
                 </div>
-              )}
+              ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   };

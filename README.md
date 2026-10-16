@@ -39,7 +39,14 @@ These are lightweight UI previews included for GitHub presentation. The live app
 - Node-level investigation workflow with `Pending`, `Active`, `Ruled Out`, and `Confirmed` statuses
 - Root-cause marking so confirmed causes can roll into resolution planning
 - Evidence-based notes and rationale capture directly on investigation nodes
+- Checking **Mark as Evidence** on a cause's note automatically sets that cause to `Ruled Out`, without needing to change its status first. Evidence on the root issue does not change its issue lifecycle.
+- Ruled-out cards display all nonempty evidence notes directly, including the parent's evidence for excluded branches. Cards grow and the tree spacing adjusts to keep the text readable.
+- Inspector notes expand to fit their full text while writing or viewing, wrap long references, and resize with the panel.
 - RAIL-style investigation action tracking with assignees, dates, and progress updates
+- New investigation actions default their assigned and due dates to the local creation day. Date pickers follow the light/dark theme. The Updates section starts collapsed in both task views; expand it to add a comment or read update history.
+- Delete a cause directly with the × on its card; the existing confirmation appears before deletion. The root issue remains protected.
+- Reuse assignees with the dropdown beside any investigation task's name field, or type a new name. Suggestions include task assignees and corrective-action owners across the current project.
+- Adding an investigation task automatically sets its cause to `Active` (or its issue to `Investigating`). Ruled-out ancestors reopen so the cause is no longer excluded; reactivated causes lose their confirmed root-cause designation, while evidence and linked corrective actions remain attached.
 - Corrective action and resolution tracking linked back to identified root causes
 - Multi-project and multi-investigation organization in one local workspace
 - Dashboard summaries for active versus inactive investigations

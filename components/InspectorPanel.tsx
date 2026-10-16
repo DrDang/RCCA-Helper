@@ -2,6 +2,9 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { ActionItem, ActionUpdate, CauseNode, IssueStatus, Note, NodeStatus, NodeType, ResolutionItem, ResolutionStatus } from '../types';
 import { ISSUE_STATUS_COLORS, ISSUE_STATUS_LABELS, NODE_STATUS_LABELS, STATUS_COLORS, RESOLUTION_STATUS_COLORS } from '../constants';
 import { useAppDialog } from './AppDialog';
+import { AssigneeInput } from './AssigneeInput';
+import { AutoSizeTextarea } from './AutoSizeTextarea';
+import { getLocalDate } from '../actionUtils';
 import {
     ClipboardList,
     StickyNote,
@@ -78,6 +81,7 @@ interface InspectorPanelProps {
   selectedNode: CauseNode | null;
   ruledOutAncestor: CauseNode | null;
   actions: ActionItem[];
+  assigneeNames: string[];
   notes: Note[];
   resolutions: ResolutionItem[];
   allRootCauses: CauseNode[];
@@ -102,6 +106,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   selectedNode,
   ruledOutAncestor,
   actions,
+  assigneeNames,
   notes,
   resolutions,
   allRootCauses,
@@ -123,7 +128,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'rail' | 'notes' | 'resolutions'>('details');
   const [collapsedResolutionIds, setCollapsedResolutionIds] = useState<Record<string, boolean>>({});
-  const [collapsedActionUpdates, setCollapsedActionUpdates] = useState<Record<string, boolean>>({});
+  const [expandedActionUpdates, setExpandedActionUpdates] = useState<Record<string, boolean>>({});
   const [collapsedResolutionUpdates, setCollapsedResolutionUpdates] = useState<Record<string, boolean>>({});
   const [expandedResolutionCauses, setExpandedResolutionCauses] = useState<Record<string, boolean>>({});
   const [newUpdateText, setNewUpdateText] = useState<Record<string, string>>({});
@@ -254,7 +259,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
   return (
     <div
       ref={panelRef}
-      className="h-full flex flex-col shadow-xl z-20 relative"
+      className="h-full min-h-0 shrink-0 flex flex-col shadow-xl z-20 relative"
       style={{ backgroundColor: 'var(--color-surface-primary)', borderLeft: '1px solid var(--color-border-primary)', width: `${width}px` }}
     >
       {/* Resize handle */}
@@ -269,7 +274,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       </div>
 
       {/* Header */}
-      <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid var(--color-border-primary)', backgroundColor: 'var(--color-surface-secondary)' }}>
+      <div className="p-4 shrink-0 flex justify-between items-center" style={{ borderBottom: '1px solid var(--color-border-primary)', backgroundColor: 'var(--color-surface-secondary)' }}>
         <div className="flex-1 min-w-0 pr-2">
             <span className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'var(--color-text-muted)' }}>{selectedNode.type}</span>
             <input
@@ -301,7 +306,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex" style={{ borderBottom: '1px solid var(--color-border-primary)' }}>
+      <div className="flex shrink-0" style={{ borderBottom: '1px solid var(--color-border-primary)' }}>
         <button
             onClick={() => setActiveTab('details')}
             className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'details' ? 'border-indigo-500 text-indigo-600' : 'border-transparent'}`}
@@ -337,7 +342,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-4" style={{ backgroundColor: 'var(--color-surface-secondary)' }}>
+      <div className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4" style={{ backgroundColor: 'var(--color-surface-secondary)' }}>
 
         {ruledOutAncestor && (
           <div
@@ -508,19 +513,18 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         <div className="grid grid-cols-2 gap-2 mb-2">
                             <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
                                 <User size={10} />
-                                <input
-                                    className="bg-transparent outline-none w-full"
-                                    style={{ borderBottom: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}
+                                <AssigneeInput
                                     value={action.assignee}
-                                    onChange={(e) => onUpdateAction({...action, assignee: e.target.value})}
-                                    placeholder="Assignee"
+                                    names={assigneeNames}
+                                    onChange={assignee => onUpdateAction({...action, assignee})}
                                 />
                             </div>
                             <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
                                 <Calendar size={10} />
                                 <input
                                     type="date"
-                                    className="bg-transparent outline-none w-full"
+                                    aria-label="Due date"
+                                    className="bg-transparent outline-none w-full min-w-0"
                                     style={{ borderBottom: '1px solid var(--color-border-primary)', color: 'var(--color-text-secondary)' }}
                                     value={action.dueDate}
                                     onChange={(e) => onUpdateAction({...action, dueDate: e.target.value})}
@@ -550,25 +554,26 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                         {/* Updates / Activity Log */}
                         <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--color-border-primary)' }}>
                             <button
-                                onClick={() => setCollapsedActionUpdates(prev => ({ ...prev, [action.id]: !prev[action.id] }))}
+                                onClick={() => setExpandedActionUpdates(prev => ({ ...prev, [action.id]: !prev[action.id] }))}
+                                aria-expanded={!!expandedActionUpdates[action.id]}
+                                aria-controls={`action-updates-${action.id}`}
                                 className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold w-full"
                                 style={{ color: 'var(--color-text-muted)' }}
                             >
                                 <ChevronRight
                                     size={12}
-                                    className={`transition-transform ${!collapsedActionUpdates[action.id] ? 'rotate-90' : ''}`}
+                                    className={`transition-transform ${expandedActionUpdates[action.id] ? 'rotate-90' : ''}`}
                                 />
                                 Updates ({(action.updates ?? []).length})
                             </button>
 
-                            {!collapsedActionUpdates[action.id] && (
-                                <div className="mt-2 space-y-2">
-                                    {/* Add new update */}
+                            {expandedActionUpdates[action.id] && (
+                                <div id={`action-updates-${action.id}`} className="mt-2 space-y-2">
                                     <div className="flex gap-1">
                                         <input
                                             type="text"
                                             placeholder="Add update..."
-                                            className="flex-1 text-xs p-1.5 rounded"
+                                            className="flex-1 min-w-0 text-xs p-1.5 rounded"
                                             style={{ backgroundColor: 'var(--color-surface-primary)', border: '1px solid var(--color-border-secondary)', color: 'var(--color-text-primary)' }}
                                             value={newUpdateText[action.id] ?? ''}
                                             onChange={(e) => setNewUpdateText(prev => ({ ...prev, [action.id]: e.target.value }))}
@@ -602,7 +607,6 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                             <MessageSquarePlus size={13} />
                                         </button>
                                     </div>
-
                                     {/* Update list (newest first) */}
                                     {(action.updates ?? []).length === 0 && (
                                         <p className="text-[10px] italic" style={{ color: 'var(--color-text-muted)' }}>No updates yet.</p>
@@ -700,8 +704,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                 action: getNextUniqueTitle('New Action', actions.map(a => a.action)),
                                 rationale: '',
                                 assignee: 'Unassigned',
-                                assignedDate: new Date().toISOString().split('T')[0],
-                                dueDate: '',
+                                assignedDate: getLocalDate(),
+                                dueDate: getLocalDate(),
                                 status: 'Open'
                             })}
                             className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 flex items-center gap-1"
@@ -792,17 +796,18 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                 <XCircle size={12} />
                             </button>
 
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex flex-wrap items-center gap-2 mb-2 pr-4">
                                 <span className="text-[10px] font-bold" style={{ color: 'var(--color-text-muted)' }}>{note.createdAt}</span>
                                 <label className="flex items-center gap-1 text-[10px] cursor-pointer select-none">
                                     <input
                                         type="checkbox"
                                         checked={note.isEvidence}
+                                        title={isIssueNode ? 'Mark this note as evidence' : 'Mark this note as evidence and set this cause to Ruled Out'}
                                         onChange={(e) => {
                                             const updated = {...note, isEvidence: e.target.checked};
                                             onDeleteNote(note.id);
                                             onAddNote(updated);
-                                            if (updated.isEvidence && pendingRuledOutNodeId === selectedNode.id) {
+                                            if (updated.isEvidence && !isIssueNode) {
                                                 onUpdateNode({ ...selectedNode, status: NodeStatus.RULED_OUT, isRootCause: false });
                                                 setPendingRuledOutNodeId(null);
                                             }
@@ -813,7 +818,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({
                                 </label>
                             </div>
 
-                            <textarea
+                            <AutoSizeTextarea
                                 className="w-full text-sm bg-transparent outline-none resize-none"
                                 style={{ color: 'var(--color-text-secondary)' }}
                                 rows={3}

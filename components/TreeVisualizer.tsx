@@ -1,9 +1,9 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import html2canvas from 'html2canvas';
 import { CauseNode, ActionItem, IssueStatus, NodeStatus, NodeType, Note, ResolutionItem } from '../types';
 import { CARD_WIDTH, CARD_HEIGHT, getNodeStatusColors } from '../constants';
-import { Plus, Move, GripVertical, ClipboardList, Crosshair, Shield, Download, StickyNote, AlertTriangle } from 'lucide-react';
+import { Plus, Move, GripVertical, ClipboardList, Crosshair, Shield, Download, StickyNote, X } from 'lucide-react';
 import { useAppDialog } from './AppDialog';
 import { getReparentError } from '../treeUtils';
 
@@ -17,6 +17,7 @@ interface TreeVisualizerProps {
   onSelectNode: (node: CauseNode) => void;
   onShowNodeNotes: (node: CauseNode) => void;
   onAddNode: (parentId: string) => void;
+  onDeleteNode: (nodeId: string) => void;
   onReparentNode: (nodeId: string, parentId: string) => Promise<void>;
 }
 
@@ -52,6 +53,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   onSelectNode,
   onShowNodeNotes,
   onAddNode,
+  onDeleteNode,
   onReparentNode
 }) => {
   const { showAlert } = useAppDialog();
@@ -62,6 +64,27 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   const dragRef = useRef<NodeDrag | null>(null);
   const [drag, setDrag] = useState<NodeDrag | null>(null);
   const confirmingRef = useRef(false);
+  const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
+
+  useLayoutEffect(() => {
+    const cards = svgRef.current?.querySelectorAll<HTMLElement>('[data-tree-node-id]');
+    if (!cards) return;
+    const measure = () => {
+      const measured: Record<string, number> = {};
+      cards.forEach(card => {
+        measured[card.dataset.treeNodeId!] = Math.max(CARD_HEIGHT, card.offsetHeight);
+      });
+      setCardHeights(previous => {
+        if (Object.keys(previous).length === Object.keys(measured).length
+          && Object.entries(measured).every(([id, height]) => previous[id] === height)) return previous;
+        return measured;
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    cards.forEach(card => observer.observe(card));
+    return () => observer.disconnect();
+  }, [data, notes]);
 
   const cancelDrag = () => {
     dragRef.current = null;
@@ -129,11 +152,22 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
 
     treeLayout(root);
 
+    // Space each level below its tallest card so full evidence never overlaps children.
+    const levelHeights: number[] = [];
+    root.each(node => {
+      levelHeights[node.depth] = Math.max(levelHeights[node.depth] ?? CARD_HEIGHT, cardHeights[node.data.id] ?? CARD_HEIGHT);
+    });
+    const levelOffsets = [0];
+    for (let depth = 1; depth < levelHeights.length; depth++) {
+      levelOffsets[depth] = levelOffsets[depth - 1] + levelHeights[depth - 1] + 80;
+    }
+    root.each(node => { node.y = levelOffsets[node.depth]; });
+
     return {
       nodes: root.descendants(),
       links: root.links()
     };
-  }, [data]);
+  }, [data, cardHeights]);
 
   // Setup Zoom/Pan
   useEffect(() => {
@@ -321,7 +355,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   // Render Logic using curved paths for standard tree look
   const generatePath = (link: d3.HierarchyLink<CauseNode>) => {
     const sourceX = link.source.x + CARD_WIDTH / 2;
-    const sourceY = link.source.y + CARD_HEIGHT;
+    const sourceY = link.source.y + (cardHeights[link.source.data.id] ?? CARD_HEIGHT);
     const targetX = link.target.x + CARD_WIDTH / 2;
     const targetY = link.target.y;
 
@@ -408,10 +442,8 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             const isLeafRootCause = !isExcluded && node.data.isRootCause === true && (!node.data.children || node.data.children.length === 0);
             const description = node.data.description.trim();
             const isDirectlyRuledOut = !isExcluded && node.data.type !== NodeType.ISSUE && node.data.status === NodeStatus.RULED_OUT;
-            const evidenceNotes = evidenceNotesByNode.get(node.data.id) ?? [];
-            const evidenceNote = evidenceNotes.find(note => note.content.trim().length > 0);
-            const evidenceReason = evidenceNote?.content.trim() ?? '';
-            const hasEvidenceReason = evidenceReason.length > 0;
+            const evidenceSource = ruledOutAncestor?.data ?? node.data;
+            const evidenceNotes = (evidenceNotesByNode.get(evidenceSource.id) ?? []).filter(note => note.content.trim());
             const isDropTarget = drag?.active && drag.targetId === node.data.id;
 
             return (
@@ -420,7 +452,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                 x={node.x}
                 y={node.y}
                 width={CARD_WIDTH}
-                height={CARD_HEIGHT}
+                height={cardHeights[node.data.id] ?? CARD_HEIGHT}
                 className="overflow-visible"
               >
                 <div
@@ -430,11 +462,12 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                     onSelectNode(node.data);
                   }}
                   className={`
-                    w-full h-full rounded-lg shadow-sm border-2 p-3 flex flex-col justify-between transition-all duration-200
+                    w-full rounded-lg shadow-sm border-2 p-3 flex flex-col justify-between
                     hover:shadow-md cursor-pointer relative group
                     ${isSelected ? 'ring-4 ring-indigo-500/30 translate-y-[-2px]' : ''}
                   `}
                   style={{
+                    minHeight: CARD_HEIGHT,
                     backgroundColor: styles.bg,
                     borderColor: isSelected ? '#6366f1' : (isLeafRootCause ? '#f59e0b' : styles.border),
                     borderStyle: isExcluded ? 'dashed' : 'solid',
@@ -485,59 +518,24 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                     </div>
                   )}
 
-                  {/* Ruled-out evidence badge with quick reason preview */}
-                  {isDirectlyRuledOut && (
+                  {node.parent && (
                     <button
                       type="button"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onShowNodeNotes(node.data);
+                      className="absolute top-2 right-2 rounded p-1 hover:bg-black/10 focus-visible:ring-2 focus-visible:ring-indigo-500"
+                      aria-label={`Delete ${node.data.label}`}
+                      title="Delete node"
+                      onPointerDown={event => event.stopPropagation()}
+                      onMouseDown={event => event.stopPropagation()}
+                      onClick={event => {
+                        event.stopPropagation();
+                        onDeleteNode(node.data.id);
                       }}
-                      className={`
-                        group/evidence absolute -bottom-2 left-3 z-20 flex h-6 w-6 items-center justify-center
-                        rounded-full border-2 border-white text-white shadow-md transition-transform
-                        hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1
-                        ${hasEvidenceReason ? 'bg-emerald-600 focus:ring-emerald-500' : 'bg-amber-500 focus:ring-amber-400'}
-                      `}
-                      aria-label={hasEvidenceReason
-                        ? `View ruled-out evidence: ${evidenceReason}`
-                        : 'View notes. No ruled-out reason has been entered.'}
                     >
-                      {hasEvidenceReason ? <StickyNote size={12} /> : <AlertTriangle size={12} />}
-                      <span
-                        role="tooltip"
-                        className="
-                          pointer-events-none invisible absolute bottom-full left-0 z-50 mb-2 w-64
-                          rounded-lg border p-3 text-left opacity-0 shadow-xl transition-opacity
-                          group-hover/evidence:visible group-hover/evidence:opacity-100
-                          group-focus-visible/evidence:visible group-focus-visible/evidence:opacity-100
-                        "
-                        style={{
-                          backgroundColor: 'var(--color-surface-primary)',
-                          borderColor: hasEvidenceReason ? 'var(--color-status-ruled-out-border)' : 'var(--color-status-pending-border)',
-                          color: 'var(--color-text-secondary)',
-                        }}
-                      >
-                        <span className="block text-[10px] font-bold uppercase tracking-wider" style={{ color: hasEvidenceReason ? 'var(--color-status-ruled-out-text)' : 'var(--color-status-pending-text)' }}>
-                          {hasEvidenceReason ? 'Ruled-out evidence' : 'Reason missing'}
-                        </span>
-                        <span className="mt-1 block whitespace-normal text-xs font-normal leading-relaxed">
-                          {hasEvidenceReason ? evidenceReason : 'This cause is ruled out, but no evidence reason has been entered.'}
-                        </span>
-                        {evidenceNote && (
-                          <span className="mt-2 block text-[10px] font-normal" style={{ color: 'var(--color-text-muted)' }}>
-                            {evidenceNote.owner} • {evidenceNote.createdAt}
-                          </span>
-                        )}
-                        <span className="mt-2 block text-[10px] font-semibold text-indigo-500">
-                          Click to open Notes{evidenceNotes.length > 1 ? ` (${evidenceNotes.length} evidence notes)` : ''}
-                        </span>
-                      </span>
+                      <X size={14} />
                     </button>
                   )}
 
-                  <div className="min-h-0 flex-1 overflow-hidden">
+                  <div className={`min-w-0 ${node.parent ? 'pr-6' : ''}`}>
                     <h3 className="font-bold text-sm leading-tight" style={{ wordBreak: 'break-word' }}>
                       {node.data.label}
                     </h3>
@@ -547,6 +545,38 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
                       </p>
                     )}
                   </div>
+
+                  {(isDirectlyRuledOut || isExcluded) && (
+                    <section
+                      aria-label="Ruled-out evidence"
+                      className="mt-3 border-t pt-2 text-xs"
+                      style={{ borderColor: styles.border, overflowWrap: 'anywhere' }}
+                    >
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-left font-semibold rounded focus-visible:ring-2 focus-visible:ring-indigo-500"
+                        onPointerDown={event => event.stopPropagation()}
+                        onClick={event => {
+                          event.stopPropagation();
+                          onShowNodeNotes(evidenceSource);
+                        }}
+                        title="Open evidence notes"
+                      >
+                        <StickyNote size={12} className="shrink-0" />
+                        Ruled-out evidence
+                      </button>
+                      {isExcluded && <p className="mt-1 font-medium">Excluded by “{evidenceSource.label}”</p>}
+                      {evidenceNotes.length > 0 ? (
+                        <div className="mt-2 space-y-2">
+                          {evidenceNotes.map(note => (
+                            <p key={note.id} className="whitespace-pre-wrap leading-relaxed">{note.content.trim()}</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-1 italic">No evidence reason recorded.</p>
+                      )}
+                    </section>
+                  )}
 
                   <div className="flex justify-between items-center mt-2">
                      {node.parent && (
@@ -609,7 +639,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
           })}
           {drag?.active && (
             <g pointerEvents="none" aria-hidden="true">
-              <rect x={drag.x} y={drag.y} width={CARD_WIDTH} height={CARD_HEIGHT} rx={8}
+              <rect x={drag.x} y={drag.y} width={CARD_WIDTH} height={cardHeights[drag.nodeId] ?? CARD_HEIGHT} rx={8}
                 fill="var(--color-surface-primary)" fillOpacity={0.8} stroke="#6366f1" strokeWidth={3} strokeDasharray="8 4" />
               <text x={drag.x + 12} y={drag.y + 26} fill="var(--color-text-primary)" fontSize={13}>
                 Moving branch…

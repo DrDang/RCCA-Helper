@@ -11,6 +11,7 @@ import { createInitialTree } from './constants';
 import { chooseJsonOpenFile, chooseJsonSaveFile, createProjectExportData, downloadJson, FileSystemFileHandleLike, getProjectFileName, isDirectFileSaveSupported, saveAppState, exportTreeAsJson, exportAllTreesAsJson, parseImportFile, loadSettings, saveSettings, getLastExportTimestamp, setLastExportTimestamp, DEFAULT_SETTINGS, exportProjectAsJson, parseProjectImportFile, ProjectImportData, writeJsonToFile } from './persistence';
 import { generateSingleReport, generateBulkReport, openReportInNewTab } from './reportGenerator';
 import { findRuledOutAncestor, getReparentError, reparentNode } from './treeUtils';
+import { addInvestigationAction, getAssigneeNames } from './actionUtils';
 import { SettingsModal } from './components/SettingsModal';
 import { ImportDialog } from './components/ImportDialog';
 import { useAppDialog } from './components/AppDialog';
@@ -134,6 +135,7 @@ const App: React.FC = () => {
   // Derive active project and its trees
   const activeProject = projects.find(p => p.id === activeProjectId) ?? null;
   const projectTrees = trees.filter(t => t.projectId === activeProjectId);
+  const assigneeNames = getAssigneeNames(projectTrees);
 
   // Derive active tree data
   const activeTree = projectTrees.find(t => t.id === activeTreeId) ?? null;
@@ -487,10 +489,7 @@ const App: React.FC = () => {
 
   // Action Helpers
   const handleAddAction = (action: ActionItem) => {
-    updateActiveTree(tree => ({
-      ...tree,
-      actions: [...tree.actions, action]
-    }));
+    updateActiveTree(tree => addInvestigationAction(tree, action));
   };
   const handleUpdateAction = (updated: ActionItem) => {
     updateActiveTree(tree => ({
@@ -1023,6 +1022,7 @@ const App: React.FC = () => {
         activeTree ? (
           <InvestigationActionsSummary
             actions={actions}
+            assigneeNames={assigneeNames}
             allNodes={allNodes}
             treeName={activeTree.name}
             onAddAction={handleAddAction}
@@ -1072,6 +1072,7 @@ const App: React.FC = () => {
                     setNotesTabRequest(request => request + 1);
                   }}
                   onAddNode={addChildNode}
+                  onDeleteNode={deleteNode}
                   onReparentNode={handleReparentNode}
               />
           </div>
@@ -1081,6 +1082,7 @@ const App: React.FC = () => {
               selectedNode={getSelectedNode()}
               ruledOutAncestor={selectedNodeId && treeData ? findRuledOutAncestor(treeData, selectedNodeId) : null}
               actions={actions}
+              assigneeNames={assigneeNames}
               notes={notes}
               resolutions={resolutions}
               allRootCauses={allRootCauses}
